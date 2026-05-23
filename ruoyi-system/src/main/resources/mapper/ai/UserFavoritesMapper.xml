@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.ai.mapper.UserFavoritesMapper">
+
+    <resultMap type="UserFavorites" id="UserFavoritesResult">
+        <result property="id"        column="id" />
+        <result property="userId"    column="user_id" />
+        <result property="herbId"    column="herb_id" />
+        <result property="createdAt" column="created_at" />
+        <result property="status"    column="status" />
+
+        <!-- 如果需要返回药材信息（用于 my-favorites 页面），可扩展 resultMap -->
+        <!-- 注意：这些字段在 UserFavorites 实体中需用 @TableField(exist = false) 标记 -->
+        <result property="herbName"     column="herb_name" />
+        <result property="category"     column="category" />
+        <result property="description"  column="description" />
+        <result property="imageUrl"     column="image_url" />
+    </resultMap>
+
+    <sql id="selectUserFavoritesVo">
+        select id, user_id, herb_id, created_at, status from user_favorites
+    </sql>
+
+    <!-- 查询收藏列表（基础） -->
+    <select id="selectUserFavoritesList" parameterType="UserFavorites" resultMap="UserFavoritesResult">
+        <include refid="selectUserFavoritesVo"/>
+        <where>
+            <if test="userId != null"> and user_id = #{userId}</if>
+            <if test="herbId != null"> and herb_id = #{herbId}</if>
+            <if test="createdAt != null"> and created_at = #{createdAt}</if>
+            <if test="status != null"> and status = #{status}</if>
+        </where>
+    </select>
+
+    <!-- 根据主键查询 -->
+    <select id="selectUserFavoritesById" parameterType="Long" resultMap="UserFavoritesResult">
+        <include refid="selectUserFavoritesVo"/>
+        where id = #{id}
+    </select>
+
+    <!-- 新增：获取用户收藏的 herb_id 列表（用于药材列表页显示收藏状态） -->
+    <select id="selectFavoriteHerbIdsByUserId" resultType="java.lang.Long">
+        SELECT herb_id
+        FROM user_favorites
+        WHERE user_id = #{userId} AND status = 1
+    </select>
+
+    <!-- 新增：联表查询“我的收藏”详情（用于“我的收藏”页面） -->
+    <select id="selectMyFavoritesWithHerb" parameterType="Long" resultMap="UserFavoritesResult">
+        SELECT
+            f.id,
+            f.user_id,
+            f.herb_id,
+            f.created_at,
+            f.status,
+            h.name AS herb_name,
+            h.category,
+            h.description,
+            h.image_url
+        FROM user_favorites f
+                 INNER JOIN herbs h ON f.herb_id = h.id
+        WHERE f.user_id = #{userId} AND f.status = 1
+        ORDER BY f.created_at DESC
+    </select>
+
+    <!-- 插入 -->
+    <insert id="insertUserFavorites" parameterType="UserFavorites" useGeneratedKeys="true" keyProperty="id">
+        insert into user_favorites
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="userId != null">user_id,</if>
+            <if test="herbId != null">herb_id,</if>
+            <if test="createdAt != null">created_at,</if>
+            <if test="status != null">status,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="userId != null">#{userId},</if>
+            <if test="herbId != null">#{herbId},</if>
+            <if test="createdAt != null">#{createdAt},</if>
+            <if test="status != null">#{status},</if>
+        </trim>
+    </insert>
+
+    <!-- 更新 -->
+    <update id="updateUserFavorites" parameterType="UserFavorites">
+        update user_favorites
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="herbId != null">herb_id = #{herbId},</if>
+            <if test="createdAt != null">created_at = #{createdAt},</if>
+            <if test="status != null">status = #{status},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <!-- 删除单条 -->
+    <delete id="deleteUserFavoritesById" parameterType="Long">
+        delete from user_favorites where id = #{id}
+    </delete>
+
+    <!-- 批量删除 -->
+    <delete id="deleteUserFavoritesByIds" parameterType="String">
+        delete from user_favorites where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

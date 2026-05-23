@@ -1,46 +1,56 @@
-# 二开推荐阅读[如何提高项目构建效率](https://developers.weixin.qq.com/miniprogram/dev/wxcloudrun/src/scene/build/speed.html)
-# 选择构建用基础镜像。如需更换，请到[dockerhub官方仓库](https://hub.docker.com/_/java?tab=tags)自行选择后替换。
-FROM maven:3.6.0-jdk-8-slim as build
+# 二开推荐阅读：如何提高项目构建效率
+# https://developers.weixin.qq.com/miniprogram/dev/wxcloudrun/src/scene/build/speed.html
+
+# =========================================================
+# 第一阶段：构建阶段
+# 使用 Maven + JDK8 编译 RuoYi 多模块项目
+# =========================================================
+FROM maven:3.8.8-eclipse-temurin-17 AS build
 
 # 指定构建过程中的工作目录
 WORKDIR /app
 
-# 将src目录下所有文件，拷贝到工作目录中src目录下（.gitignore/.dockerignore中文件除外）
-COPY src /app/src
+# 复制整个项目到容器中
+# RuoYi 是多模块项目，不能只复制 src
+# 必须把 ruoyi-admin、ruoyi-common、ruoyi-framework 等模块全部复制进去
+COPY . /app
 
-# 将pom.xml文件，拷贝到工作目录下
-COPY settings.xml pom.xml /app/
+# 执行 Maven 打包
+# -s /app/settings.xml：使用项目中的 Maven 镜像配置
+# -f /app/pom.xml：指定父工程 pom.xml
+# clean package：清理并打包
+# -DskipTests：跳过测试，避免云端构建时因为测试类失败导致部署失败
+RUN mvn -s /app/settings.xml -f /app/pom.xml clean package -DskipTests
 
-# 执行代码编译命令
-# 自定义settings.xml, 选用国内镜像源以提高下载速度
-RUN mvn -s /app/settings.xml -f /app/pom.xml clean package
 
-# 选择运行时基础镜像
-FROM alpine:3.13
+# =========================================================
+# 第二阶段：运行阶段
+# 使用 Alpine + OpenJDK8 运行打包后的 jar
+# =========================================================
+FROM eclipse-temurin:17-jre-alpine
 
-# 安装依赖包，如需其他依赖包，请到alpine依赖包管理(https://pkgs.alpinelinux.org/packages?name=php8*imagick*&branch=v3.13)查找。
-# 选用国内镜像源以提高下载速度
+# 替换 Alpine 软件源为腾讯云镜像源，提高下载速度
+# 安装 OpenJDK8 运行环境、HTTPS 证书、时区数据
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tencent.com/g' /etc/apk/repositories \
-    && apk add --update --no-cache openjdk8-jre-base \
+    && apk add --update --no-cache ca-certificates tzdata \
+    && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+    && echo Asia/Shanghai > /etc/timezone \
     && rm -f /var/cache/apk/*
 
-# 容器默认时区为UTC，如需使用上海时间请启用以下时区设置命令
-# RUN apk add tzdata && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && echo Asia/Shanghai > /etc/timezone
-
-# 使用 HTTPS 协议访问容器云调用证书安装
-RUN apk add ca-certificates
-
-# 指定运行时的工作目录
+# 指定运行时工作目录
 WORKDIR /app
 
-# 将构建产物jar包拷贝到运行时目录中
-COPY --from=build /app/target/*.jar .
+# 复制 ruoyi-admin 模块打包后的 jar 到运行目录
+# RuoYi 多模块项目最终启动 jar 一般在 ruoyi-admin/target 目录下
+# 这里统一改名为 app.jar，避免 jar 包名字不一致导致启动失败
+COPY --from=build /app/ruoyi-admin/target/*.jar /app/app.jar
 
 # 暴露端口
-# 此处端口必须与「服务设置」-「流水线」以及「手动上传代码包」部署时填写的端口一致，否则会部署失败。
-EXPOSE 80
+# 这里必须和：
+# 1. ruoyi-admin/src/main/resources/application.yml 里的 server.port
+# 2. 微信云托管服务配置里的端口
+# 保持一致
+EXPOSE 8080
 
-# 执行启动命令.
-# 写多行独立的CMD命令是错误写法！只有最后一行CMD命令会被执行，之前的都会被忽略，导致业务报错。
-# 请参考[Docker官方文档之CMD命令](https://docs.docker.com/engine/reference/builder/#cmd)
-CMD ["java", "-jar", "/app/springboot-wxcloudrun-1.0.jar"]
+# 启动 Spring Boot 项目
+CMD ["java", "-jar", "/app/app.jar"]

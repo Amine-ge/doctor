@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.ai.mapper.AiTongueRecordMapper">
+
+    <resultMap type="AiTongueRecord" id="AiTongueRecordResult">
+        <result property="id"    column="id"    />
+        <result property="userId"    column="user_id"    />
+        <result property="imageUrl"    column="image_url"    />
+        <result property="tqDetected"    column="tq_detected"    />
+        <result property="tqQualityScore"    column="tq_quality_score"    />
+        <result property="tqLightingOk"    column="tq_lighting_ok"    />
+        <result property="tqOcclusionOk"    column="tq_occlusion_ok"    />
+        <result property="tqAngleOk"    column="tq_angle_ok"    />
+        <result property="tongueColor"    column="tongue_color"    />
+        <result property="coatingColor"    column="coating_color"    />
+        <result property="coatingThickness"    column="coating_thickness"    />
+        <result property="moisture"    column="moisture"    />
+        <result property="fissures"    column="fissures"    />
+        <result property="teethMarks"    column="teeth_marks"    />
+        <result property="surfaceTexture"    column="surface_texture"    />
+        <result property="visionJson"    column="vision_json"    />
+        <result property="aiDiagnosis"    column="ai_diagnosis"    />
+        <result property="createdAt"    column="created_at"    />
+        <result property="updatedAt"    column="updated_at"    />
+        <result property="healthScore"    column="health_score"    />
+    </resultMap>
+
+    <sql id="selectAiTongueRecordVo">
+        select id, user_id, image_url, tq_detected, tq_quality_score, tq_lighting_ok, tq_occlusion_ok, tq_angle_ok, tongue_color, coating_color, coating_thickness, moisture, fissures, teeth_marks, surface_texture, vision_json, ai_diagnosis, created_at, updated_at, health_score from ai_tongue_record
+    </sql>
+
+    <select id="selectAiTongueRecordList" parameterType="AiTongueRecord" resultMap="AiTongueRecordResult">
+        <include refid="selectAiTongueRecordVo"/>
+        <where>
+            <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="imageUrl != null  and imageUrl != ''"> and image_url = #{imageUrl}</if>
+            <if test="tqDetected != null "> and tq_detected = #{tqDetected}</if>
+            <if test="tqQualityScore != null "> and tq_quality_score = #{tqQualityScore}</if>
+            <if test="tqLightingOk != null "> and tq_lighting_ok = #{tqLightingOk}</if>
+            <if test="tqOcclusionOk != null "> and tq_occlusion_ok = #{tqOcclusionOk}</if>
+            <if test="tqAngleOk != null "> and tq_angle_ok = #{tqAngleOk}</if>
+            <if test="tongueColor != null  and tongueColor != ''"> and tongue_color = #{tongueColor}</if>
+            <if test="coatingColor != null  and coatingColor != ''"> and coating_color = #{coatingColor}</if>
+            <if test="coatingThickness != null  and coatingThickness != ''"> and coating_thickness = #{coatingThickness}</if>
+            <if test="moisture != null  and moisture != ''"> and moisture = #{moisture}</if>
+            <if test="fissures != null  and fissures != ''"> and fissures = #{fissures}</if>
+            <if test="teethMarks != null  and teethMarks != ''"> and teeth_marks = #{teethMarks}</if>
+            <if test="surfaceTexture != null  and surfaceTexture != ''"> and surface_texture = #{surfaceTexture}</if>
+            <if test="visionJson != null  and visionJson != ''"> and vision_json = #{visionJson}</if>
+            <if test="aiDiagnosis != null  and aiDiagnosis != ''"> and ai_diagnosis = #{aiDiagnosis}</if>
+            <if test="createdAt != null "> and created_at = #{createdAt}</if>
+            <if test="updatedAt != null "> and updated_at = #{updatedAt}</if>
+            <if test="healthScore != null "> and health_score = #{healthScore}</if>
+        </where>
+        order by created_at desc
+    </select>
+
+    <select id="selectAiTongueRecordById" parameterType="Long" resultMap="AiTongueRecordResult">
+        <include refid="selectAiTongueRecordVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertAiTongueRecord" parameterType="AiTongueRecord" useGeneratedKeys="true" keyProperty="id">
+        insert into ai_tongue_record
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="userId != null">user_id,</if>
+            <if test="imageUrl != null">image_url,</if>
+            <if test="tqDetected != null">tq_detected,</if>
+            <if test="tqQualityScore != null">tq_quality_score,</if>
+            <if test="tqLightingOk != null">tq_lighting_ok,</if>
+            <if test="tqOcclusionOk != null">tq_occlusion_ok,</if>
+            <if test="tqAngleOk != null">tq_angle_ok,</if>
+            <if test="tongueColor != null">tongue_color,</if>
+            <if test="coatingColor != null">coating_color,</if>
+            <if test="coatingThickness != null">coating_thickness,</if>
+            <if test="moisture != null">moisture,</if>
+            <if test="fissures != null">fissures,</if>
+            <if test="teethMarks != null">teeth_marks,</if>
+            <if test="surfaceTexture != null">surface_texture,</if>
+            <if test="visionJson != null">vision_json,</if>
+            <if test="aiDiagnosis != null">ai_diagnosis,</if>
+            <if test="createdAt != null">created_at,</if>
+            <if test="updatedAt != null">updated_at,</if>
+            <if test="healthScore != null">health_score,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="userId != null">#{userId},</if>
+            <if test="imageUrl != null">#{imageUrl},</if>
+            <if test="tqDetected != null">#{tqDetected},</if>
+            <if test="tqQualityScore != null">#{tqQualityScore},</if>
+            <if test="tqLightingOk != null">#{tqLightingOk},</if>
+            <if test="tqOcclusionOk != null">#{tqOcclusionOk},</if>
+            <if test="tqAngleOk != null">#{tqAngleOk},</if>
+            <if test="tongueColor != null">#{tongueColor},</if>
+            <if test="coatingColor != null">#{coatingColor},</if>
+            <if test="coatingThickness != null">#{coatingThickness},</if>
+            <if test="moisture != null">#{moisture},</if>
+            <if test="fissures != null">#{fissures},</if>
+            <if test="teethMarks != null">#{teethMarks},</if>
+            <if test="surfaceTexture != null">#{surfaceTexture},</if>
+            <if test="visionJson != null">#{visionJson},</if>
+            <if test="aiDiagnosis != null">#{aiDiagnosis},</if>
+            <if test="createdAt != null">#{createdAt},</if>
+            <if test="updatedAt != null">#{updatedAt},</if>
+            <if test="healthScore != null">#{healthScore},</if>
+        </trim>
+    </insert>
+
+    <update id="updateAiTongueRecord" parameterType="AiTongueRecord">
+        update ai_tongue_record
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="imageUrl != null">image_url = #{imageUrl},</if>
+            <if test="tqDetected != null">tq_detected = #{tqDetected},</if>
+            <if test="tqQualityScore != null">tq_quality_score = #{tqQualityScore},</if>
+            <if test="tqLightingOk != null">tq_lighting_ok = #{tqLightingOk},</if>
+            <if test="tqOcclusionOk != null">tq_occlusion_ok = #{tqOcclusionOk},</if>
+            <if test="tqAngleOk != null">tq_angle_ok = #{tqAngleOk},</if>
+            <if test="tongueColor != null">tongue_color = #{tongueColor},</if>
+            <if test="coatingColor != null">coating_color = #{coatingColor},</if>
+            <if test="coatingThickness != null">coating_thickness = #{coatingThickness},</if>
+            <if test="moisture != null">moisture = #{moisture},</if>
+            <if test="fissures != null">fissures = #{fissures},</if>
+            <if test="teethMarks != null">teeth_marks = #{teethMarks},</if>
+            <if test="surfaceTexture != null">surface_texture = #{surfaceTexture},</if>
+            <if test="visionJson != null">vision_json = #{visionJson},</if>
+            <if test="aiDiagnosis != null">ai_diagnosis = #{aiDiagnosis},</if>
+            <if test="createdAt != null">created_at = #{createdAt},</if>
+            <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+            <if test="healthScore != null">health_score = #{healthScore},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteAiTongueRecordById" parameterType="Long">
+        delete from ai_tongue_record where id = #{id}
+    </delete>
+
+    <delete id="deleteAiTongueRecordByIds" parameterType="String">
+        delete from ai_tongue_record where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="selectLatestByUserAfter" resultType="com.ruoyi.ai.domain.AiTongueRecord">
+        SELECT *
+        FROM ai_tongue_record
+        WHERE user_id = #{userId}
+          AND created_at >= #{since}
+        ORDER BY created_at DESC, id DESC
+            LIMIT 1
+    </select>
+
+    <select id="selectDailyTongueScore" resultType="com.ruoyi.ai.domain.HealthDailyScoreDO">
+        SELECT
+            DATE(created_at) AS day,
+            AVG(health_score) AS tongueScore
+        FROM ai_tongue_record
+        WHERE user_id = #{userId}
+          AND created_at BETWEEN #{start} AND #{end}
+        GROUP BY DATE(created_at)
+    </select>
+
+</mapper>

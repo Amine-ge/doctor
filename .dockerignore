@@ -1,0 +1,10 @@
+.git
+.github
+.idea
+*.iml
+target
+**/target
+logs
+*.log
+uploadPath
+.DS_Store

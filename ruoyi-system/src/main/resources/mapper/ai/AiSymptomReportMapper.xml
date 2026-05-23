@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.ai.mapper.AiSymptomReportMapper">
+    
+    <resultMap type="AiSymptomReport" id="AiSymptomReportResult">
+        <result property="id"    column="id"    />
+        <result property="userId"    column="user_id"    />
+        <result property="tongueRecordId"    column="tongue_record_id"    />
+        <result property="faceRecordId"    column="face_record_id"    />
+        <result property="nailRecordId"    column="nail_record_id"    />
+        <result property="mainSymptom"    column="main_symptom"    />
+        <result property="aiDiagnosis"    column="ai_diagnosis"    />
+        <result property="createdAt"    column="created_at"    />
+        <result property="updatedAt"    column="updated_at"    />
+        <result property="healthScore"    column="health_score"    />
+    </resultMap>
+
+    <sql id="selectAiSymptomReportVo">
+        select id, user_id, tongue_record_id, face_record_id, nail_record_id, main_symptom, ai_diagnosis, created_at, updated_at, health_score from ai_symptom_report
+    </sql>
+
+    <select id="selectAiSymptomReportList" parameterType="AiSymptomReport" resultMap="AiSymptomReportResult">
+        <include refid="selectAiSymptomReportVo"/>
+        <where>  
+            <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="tongueRecordId != null "> and tongue_record_id = #{tongueRecordId}</if>
+            <if test="faceRecordId != null "> and face_record_id = #{faceRecordId}</if>
+            <if test="nailRecordId != null "> and nail_record_id = #{nailRecordId}</if>
+            <if test="mainSymptom != null  and mainSymptom != ''"> and main_symptom = #{mainSymptom}</if>
+            <if test="aiDiagnosis != null  and aiDiagnosis != ''"> and ai_diagnosis = #{aiDiagnosis}</if>
+            <if test="createdAt != null "> and created_at = #{createdAt}</if>
+            <if test="updatedAt != null "> and updated_at = #{updatedAt}</if>
+             <if test="healthScore != null "> and health_score = #{healthScore}</if>
+        </where>
+    </select>
+    
+    <select id="selectAiSymptomReportById" parameterType="Long" resultMap="AiSymptomReportResult">
+        <include refid="selectAiSymptomReportVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertAiSymptomReport" parameterType="AiSymptomReport" useGeneratedKeys="true" keyProperty="id">
+        insert into ai_symptom_report
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="userId != null">user_id,</if>
+            <if test="tongueRecordId != null">tongue_record_id,</if>
+            <if test="faceRecordId != null">face_record_id,</if>
+            <if test="nailRecordId != null">nail_record_id,</if>
+            <if test="mainSymptom != null">main_symptom,</if>
+            <if test="aiDiagnosis != null">ai_diagnosis,</if>
+            <if test="createdAt != null">created_at,</if>
+            <if test="updatedAt != null">updated_at,</if>
+            <if test="healthScore != null">health_score,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="userId != null">#{userId},</if>
+            <if test="tongueRecordId != null">#{tongueRecordId},</if>
+            <if test="faceRecordId != null">#{faceRecordId},</if>
+            <if test="nailRecordId != null">#{nailRecordId},</if>
+            <if test="mainSymptom != null">#{mainSymptom},</if>
+            <if test="aiDiagnosis != null">#{aiDiagnosis},</if>
+            <if test="createdAt != null">#{createdAt},</if>
+            <if test="updatedAt != null">#{updatedAt},</if>
+            <if test="healthScore != null">#{healthScore},</if>
+         </trim>
+    </insert>
+
+    <update id="updateAiSymptomReport" parameterType="AiSymptomReport">
+        update ai_symptom_report
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="tongueRecordId != null">tongue_record_id = #{tongueRecordId},</if>
+            <if test="faceRecordId != null">face_record_id = #{faceRecordId},</if>
+            <if test="nailRecordId != null">nail_record_id = #{nailRecordId},</if>
+            <if test="mainSymptom != null">main_symptom = #{mainSymptom},</if>
+            <if test="aiDiagnosis != null">ai_diagnosis = #{aiDiagnosis},</if>
+            <if test="createdAt != null">created_at = #{createdAt},</if>
+            <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+            <if test="healthScore != null">health_score = #{healthScore},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteAiSymptomReportById" parameterType="Long">
+        delete from ai_symptom_report where id = #{id}
+    </delete>
+
+    <delete id="deleteAiSymptomReportByIds" parameterType="String">
+        delete from ai_symptom_report where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="selectDailyTotalScore" resultType="com.ruoyi.ai.domain.HealthDailyScoreDO">
+        SELECT
+            DATE(created_at) AS day,
+            AVG(health_score) AS totalScore
+        FROM ai_symptom_report
+        WHERE user_id = #{userId}
+          AND created_at BETWEEN #{start} AND #{end}
+        GROUP BY DATE(created_at)
+    </select>
+
+</mapper>

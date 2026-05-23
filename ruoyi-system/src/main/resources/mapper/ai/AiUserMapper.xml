@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.ai.mapper.AiUserMapper">
+    
+    <resultMap type="AiUser" id="AiUserResult">
+        <result property="id"    column="id"    />
+        <result property="openid"    column="openid"    />
+        <result property="nickname"    column="nickname"    />
+        <result property="avatarUrl"    column="avatar_url"    />
+        <result property="gender"    column="gender"    />
+        <result property="age"    column="age"    />
+        <result property="phone"    column="phone"    />
+        <result property="status"    column="status"    />
+        <result property="createdAt"    column="created_at"    />
+        <result property="updatedAt"    column="updated_at"    />
+    </resultMap>
+
+    <sql id="selectAiUserVo">
+        select id, openid, nickname, avatar_url, gender, age, phone, status, created_at, updated_at from ai_user
+    </sql>
+
+    <select id="selectAiUserList" parameterType="AiUser" resultMap="AiUserResult">
+        <include refid="selectAiUserVo"/>
+        <where>  
+            <if test="openid != null  and openid != ''"> and openid = #{openid}</if>
+            <if test="nickname != null  and nickname != ''"> and nickname like concat('%', #{nickname}, '%')</if>
+            <if test="avatarUrl != null  and avatarUrl != ''"> and avatar_url = #{avatarUrl}</if>
+            <if test="gender != null "> and gender = #{gender}</if>
+            <if test="age != null "> and age = #{age}</if>
+            <if test="phone != null  and phone != ''"> and phone = #{phone}</if>
+            <if test="status != null "> and status = #{status}</if>
+            <if test="createdAt != null "> and created_at = #{createdAt}</if>
+            <if test="updatedAt != null "> and updated_at = #{updatedAt}</if>
+        </where>
+    </select>
+    
+    <select id="selectAiUserById" parameterType="Long" resultMap="AiUserResult">
+        <include refid="selectAiUserVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertAiUser" parameterType="AiUser" useGeneratedKeys="true" keyProperty="id">
+        insert into ai_user
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="openid != null">openid,</if>
+            <if test="nickname != null">nickname,</if>
+            <if test="avatarUrl != null">avatar_url,</if>
+            <if test="gender != null">gender,</if>
+            <if test="age != null">age,</if>
+            <if test="phone != null">phone,</if>
+            <if test="status != null">status,</if>
+            <if test="createdAt != null">created_at,</if>
+            <if test="updatedAt != null">updated_at,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="openid != null">#{openid},</if>
+            <if test="nickname != null">#{nickname},</if>
+            <if test="avatarUrl != null">#{avatarUrl},</if>
+            <if test="gender != null">#{gender},</if>
+            <if test="age != null">#{age},</if>
+            <if test="phone != null">#{phone},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createdAt != null">#{createdAt},</if>
+            <if test="updatedAt != null">#{updatedAt},</if>
+         </trim>
+    </insert>
+
+    <update id="updateAiUser" parameterType="AiUser">
+        update ai_user
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="openid != null">openid = #{openid},</if>
+            <if test="nickname != null">nickname = #{nickname},</if>
+            <if test="avatarUrl != null">avatar_url = #{avatarUrl},</if>
+            <if test="gender != null">gender = #{gender},</if>
+            <if test="age != null">age = #{age},</if>
+            <if test="phone != null">phone = #{phone},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="createdAt != null">created_at = #{createdAt},</if>
+            <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteAiUserById" parameterType="Long">
+        delete from ai_user where id = #{id}
+    </delete>
+
+    <delete id="deleteAiUserByIds" parameterType="String">
+        delete from ai_user where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

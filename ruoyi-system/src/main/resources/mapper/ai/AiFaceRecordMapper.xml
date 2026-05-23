@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.ai.mapper.AiFaceRecordMapper">
+    
+    <resultMap type="AiFaceRecord" id="AiFaceRecordResult">
+        <result property="id"    column="id"    />
+        <result property="userId"    column="user_id"    />
+        <result property="imageUrl"    column="image_url"    />
+        <result property="fqDetected"    column="fq_detected"    />
+        <result property="fqQualityScore"    column="fq_quality_score"    />
+        <result property="fqLightingOk"    column="fq_lighting_ok"    />
+        <result property="fqOcclusionOk"    column="fq_occlusion_ok"    />
+        <result property="skinTone"    column="skin_tone"    />
+        <result property="oilinessLevel"    column="oiliness_level"    />
+        <result property="darkCirclesLevel"    column="dark_circles_level"    />
+        <result property="acneLevel"    column="acne_level"    />
+        <result property="lipColor"    column="lip_color"    />
+        <result property="notes"    column="notes"    />
+        <result property="visionJson"    column="vision_json"    />
+        <result property="aiDiagnosis"    column="ai_diagnosis"    />
+        <result property="createdAt"    column="created_at"    />
+        <result property="updatedAt"    column="updated_at"    />
+        <result property="healthScore"    column="health_score"    />
+
+    </resultMap>
+
+    <sql id="selectAiFaceRecordVo">
+        select id, user_id, image_url, fq_detected, fq_quality_score, fq_lighting_ok, fq_occlusion_ok, skin_tone, oiliness_level, dark_circles_level, acne_level, lip_color, notes, vision_json, ai_diagnosis, created_at, updated_at, health_score from ai_face_record
+    </sql>
+
+    <select id="selectAiFaceRecordList" parameterType="AiFaceRecord" resultMap="AiFaceRecordResult">
+        <include refid="selectAiFaceRecordVo"/>
+        <where>  
+            <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="imageUrl != null  and imageUrl != ''"> and image_url = #{imageUrl}</if>
+            <if test="fqDetected != null "> and fq_detected = #{fqDetected}</if>
+            <if test="fqQualityScore != null "> and fq_quality_score = #{fqQualityScore}</if>
+            <if test="fqLightingOk != null "> and fq_lighting_ok = #{fqLightingOk}</if>
+            <if test="fqOcclusionOk != null "> and fq_occlusion_ok = #{fqOcclusionOk}</if>
+            <if test="skinTone != null  and skinTone != ''"> and skin_tone = #{skinTone}</if>
+            <if test="oilinessLevel != null  and oilinessLevel != ''"> and oiliness_level = #{oilinessLevel}</if>
+            <if test="darkCirclesLevel != null  and darkCirclesLevel != ''"> and dark_circles_level = #{darkCirclesLevel}</if>
+            <if test="acneLevel != null  and acneLevel != ''"> and acne_level = #{acneLevel}</if>
+            <if test="lipColor != null  and lipColor != ''"> and lip_color = #{lipColor}</if>
+            <if test="notes != null  and notes != ''"> and notes = #{notes}</if>
+            <if test="visionJson != null  and visionJson != ''"> and vision_json = #{visionJson}</if>
+            <if test="aiDiagnosis != null  and aiDiagnosis != ''"> and ai_diagnosis = #{aiDiagnosis}</if>
+            <if test="createdAt != null "> and created_at = #{createdAt}</if>
+            <if test="updatedAt != null "> and updated_at = #{updatedAt}</if>
+            <if test="healthScore != null "> and health_score = #{healthScore}</if>
+        </where>
+        order by created_at desc
+    </select>
+    
+    <select id="selectAiFaceRecordById" parameterType="Long" resultMap="AiFaceRecordResult">
+        <include refid="selectAiFaceRecordVo"/>
+        where id = #{id}
+    </select>
+    <select id="selectLatestByUserAfter" resultType="com.ruoyi.ai.domain.AiFaceRecord">
+        SELECT *
+        FROM ai_face_record
+        WHERE user_id = #{userId}
+          AND created_at >= #{since}
+        ORDER BY created_at DESC, id DESC
+            LIMIT 1
+    </select>
+
+
+    <insert id="insertAiFaceRecord" parameterType="AiFaceRecord" useGeneratedKeys="true" keyProperty="id">
+        insert into ai_face_record
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="userId != null">user_id,</if>
+            <if test="imageUrl != null">image_url,</if>
+            <if test="fqDetected != null">fq_detected,</if>
+            <if test="fqQualityScore != null">fq_quality_score,</if>
+            <if test="fqLightingOk != null">fq_lighting_ok,</if>
+            <if test="fqOcclusionOk != null">fq_occlusion_ok,</if>
+            <if test="skinTone != null">skin_tone,</if>
+            <if test="oilinessLevel != null">oiliness_level,</if>
+            <if test="darkCirclesLevel != null">dark_circles_level,</if>
+            <if test="acneLevel != null">acne_level,</if>
+            <if test="lipColor != null">lip_color,</if>
+            <if test="notes != null">notes,</if>
+            <if test="visionJson != null">vision_json,</if>
+            <if test="aiDiagnosis != null">ai_diagnosis,</if>
+            <if test="createdAt != null">created_at,</if>
+            <if test="updatedAt != null">updated_at,</if>
+            <if test="healthScore != null">health_score,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="userId != null">#{userId},</if>
+            <if test="imageUrl != null">#{imageUrl},</if>
+            <if test="fqDetected != null">#{fqDetected},</if>
+            <if test="fqQualityScore != null">#{fqQualityScore},</if>
+            <if test="fqLightingOk != null">#{fqLightingOk},</if>
+            <if test="fqOcclusionOk != null">#{fqOcclusionOk},</if>
+            <if test="skinTone != null">#{skinTone},</if>
+            <if test="oilinessLevel != null">#{oilinessLevel},</if>
+            <if test="darkCirclesLevel != null">#{darkCirclesLevel},</if>
+            <if test="acneLevel != null">#{acneLevel},</if>
+            <if test="lipColor != null">#{lipColor},</if>
+            <if test="notes != null">#{notes},</if>
+            <if test="visionJson != null">#{visionJson},</if>
+            <if test="aiDiagnosis != null">#{aiDiagnosis},</if>
+            <if test="createdAt != null">#{createdAt},</if>
+            <if test="updatedAt != null">#{updatedAt},</if>
+            <if test="healthScore != null">#{healthScore},</if>
+         </trim>
+    </insert>
+
+    <update id="updateAiFaceRecord" parameterType="AiFaceRecord">
+        update ai_face_record
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="imageUrl != null">image_url = #{imageUrl},</if>
+            <if test="fqDetected != null">fq_detected = #{fqDetected},</if>
+            <if test="fqQualityScore != null">fq_quality_score = #{fqQualityScore},</if>
+            <if test="fqLightingOk != null">fq_lighting_ok = #{fqLightingOk},</if>
+            <if test="fqOcclusionOk != null">fq_occlusion_ok = #{fqOcclusionOk},</if>
+            <if test="skinTone != null">skin_tone = #{skinTone},</if>
+            <if test="oilinessLevel != null">oiliness_level = #{oilinessLevel},</if>
+            <if test="darkCirclesLevel != null">dark_circles_level = #{darkCirclesLevel},</if>
+            <if test="acneLevel != null">acne_level = #{acneLevel},</if>
+            <if test="lipColor != null">lip_color = #{lipColor},</if>
+            <if test="notes != null">notes = #{notes},</if>
+            <if test="visionJson != null">vision_json = #{visionJson},</if>
+            <if test="aiDiagnosis != null">ai_diagnosis = #{aiDiagnosis},</if>
+            <if test="createdAt != null">created_at = #{createdAt},</if>
+            <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+            <if test="healthScore != null">health_score = #{healthScore},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteAiFaceRecordById" parameterType="Long">
+        delete from ai_face_record where id = #{id}
+    </delete>
+
+    <delete id="deleteAiFaceRecordByIds" parameterType="String">
+        delete from ai_face_record where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+    <select id="selectDailyFaceScore" resultType="com.ruoyi.ai.domain.HealthDailyScoreDO">
+        SELECT
+            DATE(created_at) AS day,
+            AVG(health_score) AS faceScore
+        FROM ai_face_record
+        WHERE user_id = #{userId}
+          AND created_at BETWEEN #{start} AND #{end}
+        GROUP BY DATE(created_at)
+    </select>
+
+</mapper>
