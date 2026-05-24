@@ -92,14 +92,14 @@ ai-doctor:
       accessKeySecret: ${ALIYUN_OSS_ACCESS_KEY_SECRET}
       bucketName: ${ALIYUN_OSS_BUCKET_NAME:g-ai-doctor}
 
-wechat:
-  appid: ${WECHAT_APPID}
-  secret: ${WECHAT_SECRET}
+  wechat:
+    appid: ${WECHAT_APPID}
+    secret: ${WECHAT_SECRET}
 
-jwt:
-  secret: ${JWT_SECRET}
-  ttl: ${JWT_TTL:72000000}
-  auth-header: ${JWT_AUTH_HEADER:X-Wecom-Token}
+  jwt:
+    secret: ${JWT_SECRET}
+    ttl: ${JWT_TTL:72000000}
+    auth-header: ${JWT_AUTH_HEADER:X-Wecom-Token}
 # token配置
 token:
   # 令牌自定义标识
