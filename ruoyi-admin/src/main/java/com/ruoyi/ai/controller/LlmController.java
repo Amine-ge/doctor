@@ -40,7 +40,11 @@ public class LlmController {
 
     @PostMapping("/face/{id}/generate")
     public R<?> generateFace(@PathVariable Long id, @RequestBody JSONObject finalJson) {
-        return R.ok(service.generateFaceDiagnosis(id, finalJson));
+        try {
+            return R.ok(service.generateFaceDiagnosis(id, finalJson));
+        } catch (Exception e) {
+            return R.fail(e.getMessage());
+        }
     }
     @PostMapping("/nail/{id}/generate")
     public R<?> generateNail(@PathVariable Long id, @RequestBody JSONObject finalJson) {

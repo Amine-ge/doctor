@@ -200,7 +200,11 @@ public class DoubaoVisionController {
         record.setUserId(userId);
         record.setImageUrl(imageUrl);
         record.setVisionJson(visionJson);
-        record.setFqDetected(Convert.toBool(tq.get("detected"), false) ? 1 : 0);
+        int detected = Convert.toBool(tq.get("detected"), false) ? 1 : 0;
+        if (detected == 0) {
+            throw new ServiceException("No face detected in image");
+        }
+        record.setFqDetected(detected);
         record.setFqLightingOk(Convert.toBool(tq.get("lighting_ok"), false) ? 1 : 0);
         record.setFqOcclusionOk(Convert.toBool(tq.get("occlusion_ok"), false) ? 1 : 0);
         record.setFqQualityScore(Convert.toBigDecimal(tq.get("quality_score"), BigDecimal.ZERO));
@@ -247,6 +251,9 @@ public class DoubaoVisionController {
         }
         if (record.getVisionJson() == null || record.getVisionJson().isBlank()) {
             return FACE_STATUS_PROCESSING;
+        }
+        if (record.getFqDetected() == null || record.getFqDetected() != 1) {
+            return FACE_STATUS_FAILED;
         }
         return FACE_STATUS_SUCCESS;
     }

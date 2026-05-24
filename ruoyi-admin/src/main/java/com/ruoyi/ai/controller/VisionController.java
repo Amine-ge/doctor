@@ -42,7 +42,11 @@ public class VisionController {
         if (aiUser == null) {
             return R.fail("请先登录");
         }
-        return R.ok(service.face(body.get("url"),aiUser.getId()));
+        try {
+            return R.ok(service.face(body.get("url"),aiUser.getId()));
+        } catch (ServiceException e) {
+            return R.fail(e.getMessage());
+        }
     }
 
     @PostMapping("/nail")

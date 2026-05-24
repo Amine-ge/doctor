@@ -154,6 +154,13 @@ public class LlmServiceImpl implements LlmService {
 
     @Override
     public String generateFaceDiagnosis(Long id, com.alibaba.fastjson2.JSONObject finalJson) {
+        AiFaceRecord record = aiFaceRecordMapper.selectAiFaceRecordById(id);
+        if (record == null) {
+            throw new IllegalArgumentException("Face record not found");
+        }
+        if (record.getFqDetected() == null || record.getFqDetected() != 1) {
+            throw new IllegalArgumentException("No face detected, cannot generate face report");
+        }
         String text = generate(AiPrompts.SYS_FACE_EXPLAIN, finalJson);
         aiFaceRecordMapper.updateDiagnosis(id, text);
         return text ;

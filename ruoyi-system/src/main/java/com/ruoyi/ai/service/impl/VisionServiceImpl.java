@@ -108,7 +108,11 @@ public class VisionServiceImpl implements VisionService {
         var obj = JSONUtil.parseObj(clean);
         JSONObject tq = obj.getJSONObject("face_quality");
 
-        record.setFqDetected(Convert.toBool(tq.get("detected"), false) ? 1 : 0);
+        int detected = Convert.toBool(tq.get("detected"), false) ? 1 : 0;
+        if (detected == 0) {
+            throw new ServiceException("No face detected in image");
+        }
+        record.setFqDetected(detected);
         record.setFqLightingOk(Convert.toBool(tq.get("lighting_ok"), false) ? 1 : 0);
         record.setFqOcclusionOk(Convert.toBool(tq.get("occlusion_ok"), false) ? 1 : 0);
         record.setFqQualityScore(Convert.toBigDecimal(tq.get("quality_score"), BigDecimal.ZERO));
