@@ -52,6 +52,7 @@ public class HttpClientUtil {
 
             //创建GET请求
             HttpGet httpGet = new HttpGet(uri);
+            httpGet.setConfig(builderRequestConfig());
 
             //发送请求
             response = httpClient.execute(httpGet);
@@ -61,14 +62,10 @@ public class HttpClientUtil {
                 result = EntityUtils.toString(response.getEntity(),"UTF-8");
             }
         }catch (Exception e){
-            e.printStackTrace();
+            throw new RuntimeException("HTTP GET request failed: " + url, e);
         }finally {
-            try {
-                response.close();
-                httpClient.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            close(response);
+            close(httpClient);
         }
 
         return result;
@@ -111,11 +108,8 @@ public class HttpClientUtil {
         } catch (Exception e) {
             throw e;
         } finally {
-            try {
-                response.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            close(response);
+            close(httpClient);
         }
 
         return resultString;
@@ -161,11 +155,8 @@ public class HttpClientUtil {
         } catch (Exception e) {
             throw e;
         } finally {
-            try {
-                response.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            close(response);
+            close(httpClient);
         }
 
         return resultString;
@@ -175,6 +166,28 @@ public class HttpClientUtil {
                 .setConnectTimeout(TIMEOUT_MSEC)
                 .setConnectionRequestTimeout(TIMEOUT_MSEC)
                 .setSocketTimeout(TIMEOUT_MSEC).build();
+    }
+
+    private static void close(CloseableHttpResponse response) {
+        if (response == null) {
+            return;
+        }
+        try {
+            response.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void close(CloseableHttpClient httpClient) {
+        if (httpClient == null) {
+            return;
+        }
+        try {
+            httpClient.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
 }

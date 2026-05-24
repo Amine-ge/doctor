@@ -1,56 +1,48 @@
-# 二开推荐阅读：如何提高项目构建效率
-# https://developers.weixin.qq.com/miniprogram/dev/wxcloudrun/src/scene/build/speed.html
+# 二开推荐阅读：https://developers.weixin.qq.com/miniprogram/dev/wxcloudrun/src/scene/build/speed.html
+# 当前项目：RuoYi 多模块 Spring Boot 项目
+# 后端端口：8080
+# Java 版本：17
 
-# =========================================================
-# 第一阶段：构建阶段
-# 使用 Maven + JDK8 编译 RuoYi 多模块项目
-# =========================================================
+# =========================
+# 第一阶段：Maven 构建阶段
+# =========================
 FROM maven:3.8.8-eclipse-temurin-17 AS build
 
-# 指定构建过程中的工作目录
+# 指定构建工作目录
 WORKDIR /app
 
-# 复制整个项目到容器中
-# RuoYi 是多模块项目，不能只复制 src
-# 必须把 ruoyi-admin、ruoyi-common、ruoyi-framework 等模块全部复制进去
+# 拷贝整个项目到容器中
+# RuoYi 是多模块项目，不能只 COPY src 和 pom.xml
 COPY . /app
 
-# 执行 Maven 打包
-# -s /app/settings.xml：使用项目中的 Maven 镜像配置
-# -f /app/pom.xml：指定父工程 pom.xml
-# clean package：清理并打包
-# -DskipTests：跳过测试，避免云端构建时因为测试类失败导致部署失败
-RUN mvn -s /app/settings.xml -f /app/pom.xml clean package -DskipTests
+# 使用项目中的 settings.xml 构建，如果你的项目没有 settings.xml，把这一行改成：
+# RUN mvn clean package -DskipTests
+RUN mvn -s /app/settings.xml clean package -DskipTests
 
 
-# =========================================================
+# =========================
 # 第二阶段：运行阶段
-# 使用 Alpine + OpenJDK8 运行打包后的 jar
-# =========================================================
-FROM eclipse-temurin:17-jre-alpine
+# =========================
+FROM eclipse-temurin:17-jre
 
-# 替换 Alpine 软件源为腾讯云镜像源，提高下载速度
-# 安装 OpenJDK8 运行环境、HTTPS 证书、时区数据
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tencent.com/g' /etc/apk/repositories \
-    && apk add --update --no-cache ca-certificates tzdata \
-    && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
-    && echo Asia/Shanghai > /etc/timezone \
-    && rm -f /var/cache/apk/*
+# 安装 HTTPS CA 证书，解决调用微信 HTTPS 接口证书链校验失败问题
+RUN apt-get update \
+    && apt-get install -y ca-certificates \
+    && update-ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# 指定运行时工作目录
+# 设置时区为上海时间，可选
+ENV TZ=Asia/Shanghai
+
+# 指定运行目录
 WORKDIR /app
 
-# 复制 ruoyi-admin 模块打包后的 jar 到运行目录
-# RuoYi 多模块项目最终启动 jar 一般在 ruoyi-admin/target 目录下
-# 这里统一改名为 app.jar，避免 jar 包名字不一致导致启动失败
+# 拷贝 RuoYi admin 模块构建出的 jar 包
 COPY --from=build /app/ruoyi-admin/target/*.jar /app/app.jar
 
 # 暴露端口
-# 这里必须和：
-# 1. ruoyi-admin/src/main/resources/application.yml 里的 server.port
-# 2. 微信云托管服务配置里的端口
-# 保持一致
+# 必须和 application.yml 的 server.port、微信云托管服务端口一致
 EXPOSE 8080
 
-# 启动 Spring Boot 项目
+# 启动命令
 CMD ["java", "-jar", "/app/app.jar"]
