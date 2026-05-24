@@ -11,6 +11,7 @@ import com.ruoyi.ai.mapper.AiFaceRecordMapper;
 import com.ruoyi.ai.mapper.AiNailRecordMapper;
 import com.ruoyi.ai.mapper.AiTongueRecordMapper;
 import com.ruoyi.ai.service.DoubaoVisionService;
+import com.ruoyi.ai.support.AiAsyncTaskManager;
 import com.ruoyi.ai.utils.VisionJsonUtils;
 import com.ruoyi.common.core.domain.R;
 import com.ruoyi.common.exception.ServiceException;
@@ -29,10 +30,6 @@ import java.math.BigDecimal;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 @RestController
 @RequestMapping("/api/ai")
@@ -43,9 +40,6 @@ public class DoubaoVisionController {
     private static final String STATUS_SUCCESS = "SUCCESS";
     private static final String STATUS_FAILED = "FAILED";
     private static final String FAILED_PREFIX = "FAILED: ";
-
-    private final Map<String, Map<String, Object>> aiTaskStore = new ConcurrentHashMap<>();
-    private final ExecutorService aiTaskExecutor = Executors.newFixedThreadPool(8);
 
     @Resource
     private DoubaoVisionService doubaoVisionService;
@@ -58,6 +52,9 @@ public class DoubaoVisionController {
 
     @Resource
     private AiNailRecordMapper aiNailRecordMapper;
+
+    @Resource
+    private AiAsyncTaskManager aiAsyncTaskManager;
 
     @PostMapping("/tongue")
     public R<Map<String, Object>> analyzeTongue(@RequestBody Map<String, String> body) {
@@ -182,12 +179,11 @@ public class DoubaoVisionController {
 
         try {
             String imageUrl = validateImageUrl(body.get("url"));
-            String taskId = createTask();
-            startJsonTask(taskId, () -> {
+            String taskId = aiAsyncTaskManager.submit(() -> {
                 String visionJson = VisionJsonUtils.extractJsonObject(doubaoVisionService.analyzeMedicalReport(imageUrl));
                 return JSONUtil.parseObj(visionJson);
             });
-            return R.ok(taskPayload(taskId), "accepted");
+            return R.ok(aiAsyncTaskManager.processingPayload(taskId), "accepted");
         } catch (Exception e) {
             return R.fail(e.getMessage());
         }
@@ -202,12 +198,11 @@ public class DoubaoVisionController {
 
         try {
             String imageUrl = validateImageUrl(body.get("url"));
-            String taskId = createTask();
-            startJsonTask(taskId, () -> {
+            String taskId = aiAsyncTaskManager.submit(() -> {
                 String visionJson = VisionJsonUtils.extractJsonObject(doubaoVisionService.analyzeMedicine(imageUrl));
                 return JSONUtil.parseObj(visionJson);
             });
-            return R.ok(taskPayload(taskId), "accepted");
+            return R.ok(aiAsyncTaskManager.processingPayload(taskId), "accepted");
         } catch (Exception e) {
             return R.fail(e.getMessage());
         }
@@ -215,7 +210,7 @@ public class DoubaoVisionController {
 
     @GetMapping("/task/{taskId}")
     public R<Map<String, Object>> getTaskResult(@PathVariable String taskId) {
-        Map<String, Object> task = aiTaskStore.get(taskId);
+        Map<String, Object> task = aiAsyncTaskManager.get(taskId);
         if (task == null) {
             return R.fail("task not found");
         }
@@ -418,61 +413,17 @@ public class DoubaoVisionController {
         }
     }
 
-    private String createTask() {
-        String taskId = UUID.randomUUID().toString();
-        aiTaskStore.put(taskId, taskPayload(taskId));
-        return taskId;
-    }
-
-    private Map<String, Object> taskPayload(String taskId) {
-        Map<String, Object> task = new HashMap<>();
-        task.put("taskId", taskId);
-        task.put("status", STATUS_PROCESSING);
-        return task;
-    }
-
-    private void startJsonTask(String taskId, JsonTask task) {
-        try {
-            aiTaskExecutor.execute(() -> completeJsonTask(taskId, task));
-        } catch (Exception e) {
-            log.error("Async json task submit failed, taskId={}", taskId, e);
-            Map<String, Object> data = new HashMap<>();
-            data.put("taskId", taskId);
-            data.put("status", STATUS_FAILED);
-            data.put("message", safeMessage(e));
-            aiTaskStore.put(taskId, data);
-        }
-    }
-
     private void startBackgroundTask(String type, Long recordId, Runnable task) {
         try {
-            aiTaskExecutor.execute(task);
+            aiAsyncTaskManager.execute(task);
         } catch (Exception e) {
             log.error("Async {} task submit failed, recordId={}", type, recordId, e);
             throw new ServiceException("AI task submit failed: " + safeMessage(e));
         }
     }
 
-    private void completeJsonTask(String taskId, JsonTask task) {
-        Map<String, Object> data = new HashMap<>();
-        data.put("taskId", taskId);
-        try {
-            data.put("status", STATUS_SUCCESS);
-            data.put("result", task.run());
-        } catch (Exception e) {
-            log.error("Async json task failed, taskId={}", taskId, e);
-            data.put("status", STATUS_FAILED);
-            data.put("message", safeMessage(e));
-        }
-        aiTaskStore.put(taskId, data);
-    }
-
     private String safeMessage(Exception e) {
         return e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
     }
 
-    @FunctionalInterface
-    private interface JsonTask {
-        Object run();
-    }
 }

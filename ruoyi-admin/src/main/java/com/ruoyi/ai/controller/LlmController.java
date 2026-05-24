@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSONObject;
 import com.ruoyi.ai.domain.AiUser;
 import com.ruoyi.ai.domain.dto.AskDTO;
 import com.ruoyi.ai.service.LlmService;
+import com.ruoyi.ai.support.AiAsyncTaskManager;
 import com.ruoyi.common.core.domain.R;
 import com.ruoyi.utils.FastGptUtils;
 import com.ruoyi.utils.UserHold;
@@ -19,6 +20,9 @@ public class LlmController {
 
     @Resource
     private LlmService service;
+
+    @Resource
+    private AiAsyncTaskManager aiAsyncTaskManager;
 
     @PostMapping("/ask")
     public R<String> summary(@RequestBody AskDTO dto) {
@@ -53,9 +57,16 @@ public class LlmController {
                 chatId = "ai-doctor-user-" + aiUser.getId();
             }
 
-            String answer = FastGptUtils.chat(chatId, message);
-            Map<String, Object> data = new HashMap<>();
-            data.put("answer", answer);
+            final String finalChatId = chatId;
+            String taskId = aiAsyncTaskManager.submit(() -> {
+                String answer = FastGptUtils.chat(finalChatId, message);
+                Map<String, Object> result = new HashMap<>();
+                result.put("answer", answer);
+                result.put("chatId", finalChatId);
+                return result;
+            });
+
+            Map<String, Object> data = aiAsyncTaskManager.processingPayload(taskId);
             data.put("chatId", chatId);
             return R.ok(data);
         } catch (Exception e) {
