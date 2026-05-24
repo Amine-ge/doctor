@@ -1,15 +1,12 @@
 package com.ruoyi.ai.service.impl;
 
 import java.math.BigDecimal;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import cn.hutool.core.date.DateTime;
 import cn.hutool.core.lang.UUID;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.ai.domain.AiFaceRecord;
 import com.ruoyi.ai.domain.AiNailRecord;
@@ -24,9 +21,11 @@ import com.ruoyi.ai.mapper.AiTongueRecordMapper;
 import com.ruoyi.ai.mapper.AiUserMapper;
 import com.ruoyi.ai.service.IAiUserService;
 import com.ruoyi.properties.WeChatProperties;
+import com.ruoyi.utils.HttpsIgnoreSslUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
+
 /**
  * 用户信息Service业务层处理
  */
@@ -77,7 +76,6 @@ public class AiUserServiceImpl extends ServiceImpl<AiUserMapper, AiUser> impleme
         return aiUserMapper.deleteAiUserById(id);
     }
 
-
     @Override
     public AiUser wxLogin(UserDTO userDto) {
         // 1. 用 code 换 openid
@@ -120,7 +118,7 @@ public class AiUserServiceImpl extends ServiceImpl<AiUserMapper, AiUser> impleme
         userVo.setAvatarUrl(user.getAvatarUrl());
         userVo.setPhone(user.getPhone());
         userVo.setAge(user.getAge());
-       userVo.setGender(user.getGender());
+        userVo.setGender(user.getGender());
         userVo.setStatus(user.getStatus());
         userVo.setUpdatedAt(user.getUpdatedAt());
         userVo.setCreatedAt(user.getCreatedAt());
@@ -144,43 +142,46 @@ public class AiUserServiceImpl extends ServiceImpl<AiUserMapper, AiUser> impleme
     @Override
     public void updateUser(AiUser user) {
 //        user.setUpdatedAt(DateTime.now());
-        aiUserMapper.updateAiUser( user);
+        aiUserMapper.updateAiUser(user);
     }
-
 
     private String getOpenid(UserDTO userLoginDTO) {
-        String url = org.springframework.web.util.UriComponentsBuilder
-                .fromHttpUrl(WX_LOGIN)
-                .queryParam("appid", weChatProperties.getAppid())
-                .queryParam("secret", weChatProperties.getSecret())
-                .queryParam("js_code", userLoginDTO.getCode())
-                .queryParam("grant_type", "authorization_code")
-                .toUriString();
+        try {
+            String url = UriComponentsBuilder
+                    .fromHttpUrl(WX_LOGIN)
+                    .queryParam("appid", weChatProperties.getAppid())
+                    .queryParam("secret", weChatProperties.getSecret())
+                    .queryParam("js_code", userLoginDTO.getCode())
+                    .queryParam("grant_type", "authorization_code")
+                    .toUriString();
 
-        org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
+            String json = HttpsIgnoreSslUtil.doGet(url);
 
-        String json = restTemplate.getForObject(url, String.class);
+            System.out.println("微信 jscode2session 返回：" + json);
 
-        System.out.println("微信 jscode2session 返回：" + json);
+            if (json == null || json.trim().isEmpty()) {
+                throw new RuntimeException("微信登录失败：微信接口返回为空");
+            }
 
-        JSONObject jsonObject = JSON.parseObject(json);
+            JSONObject jsonObject = JSON.parseObject(json);
 
-        if (jsonObject == null) {
-            throw new RuntimeException("微信登录失败：微信接口返回为空");
+            if (jsonObject.containsKey("errcode")) {
+                throw new RuntimeException("微信登录失败：" + jsonObject.toJSONString());
+            }
+
+            String openid = jsonObject.getString("openid");
+
+            if (openid == null || openid.trim().isEmpty()) {
+                throw new RuntimeException("微信登录失败：openid为空，微信返回：" + json);
+            }
+
+            return openid;
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("微信登录失败，请稍后重试", e);
         }
-
-        if (jsonObject.containsKey("errcode")) {
-            throw new RuntimeException("微信登录失败：" + jsonObject.toJSONString());
-        }
-
-        String openid = jsonObject.getString("openid");
-
-        if (openid == null || openid.trim().isEmpty()) {
-            throw new RuntimeException("微信登录失败：openid为空，微信返回：" + json);
-        }
-
-        return openid;
     }
+
     private LatestHealthDataVo.Item buildTongueItem(AiTongueRecord r) {
         LatestHealthDataVo.Item item = new LatestHealthDataVo.Item();
         if (r == null) {
@@ -191,7 +192,7 @@ public class AiUserServiceImpl extends ServiceImpl<AiUserMapper, AiUser> impleme
         item.setId(r.getId());
         item.setCreatedAt(r.getCreatedAt());
 
-        BigDecimal score = r.getTqQualityScore(); // BigDecimal
+        BigDecimal score = r.getTqQualityScore();
 
         if (score == null) {
             item.setStatusText("未检测");
@@ -206,7 +207,6 @@ public class AiUserServiceImpl extends ServiceImpl<AiUserMapper, AiUser> impleme
         return item;
     }
 
-
     private LatestHealthDataVo.Item buildFaceItem(AiFaceRecord r) {
         LatestHealthDataVo.Item item = new LatestHealthDataVo.Item();
         if (r == null) {
@@ -217,7 +217,7 @@ public class AiUserServiceImpl extends ServiceImpl<AiUserMapper, AiUser> impleme
         item.setId(r.getId());
         item.setCreatedAt(r.getCreatedAt());
 
-        BigDecimal score = r.getFqQualityScore(); // 改成你的字段
+        BigDecimal score = r.getFqQualityScore();
 
         if (score == null) {
             item.setStatusText("未检测");
@@ -242,7 +242,7 @@ public class AiUserServiceImpl extends ServiceImpl<AiUserMapper, AiUser> impleme
         item.setId(r.getId());
         item.setCreatedAt(r.getCreatedAt());
 
-        BigDecimal score = r.getNqQualityScore(); // 改成你的字段 nailQualityScore
+        BigDecimal score = r.getNqQualityScore();
 
         if (score == null) {
             item.setStatusText("未检测");
