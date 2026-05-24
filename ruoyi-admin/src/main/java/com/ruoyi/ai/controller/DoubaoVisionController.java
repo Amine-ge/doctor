@@ -17,7 +17,6 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.utils.UserHold;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,16 +29,23 @@ import java.math.BigDecimal;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @RestController
 @RequestMapping("/api/ai")
 public class DoubaoVisionController {
 
     private static final Logger log = LoggerFactory.getLogger(DoubaoVisionController.class);
-    private static final String FACE_STATUS_PROCESSING = "PROCESSING";
-    private static final String FACE_STATUS_SUCCESS = "SUCCESS";
-    private static final String FACE_STATUS_FAILED = "FAILED";
-    private static final String FACE_FAILED_PREFIX = "FAILED: ";
+    private static final String STATUS_PROCESSING = "PROCESSING";
+    private static final String STATUS_SUCCESS = "SUCCESS";
+    private static final String STATUS_FAILED = "FAILED";
+    private static final String FAILED_PREFIX = "FAILED: ";
+
+    private final Map<String, Map<String, Object>> aiTaskStore = new ConcurrentHashMap<>();
+    private final ExecutorService aiTaskExecutor = Executors.newFixedThreadPool(8);
 
     @Resource
     private DoubaoVisionService doubaoVisionService;
@@ -53,23 +59,42 @@ public class DoubaoVisionController {
     @Resource
     private AiNailRecordMapper aiNailRecordMapper;
 
-    @Resource(name = "threadPoolTaskExecutor")
-    private ThreadPoolTaskExecutor taskExecutor;
-
     @PostMapping("/tongue")
-    public R<AiTongueRecord> analyzeTongue(@RequestBody Map<String, String> body) {
+    public R<Map<String, Object>> analyzeTongue(@RequestBody Map<String, String> body) {
         AiUser aiUser = UserHold.get();
         if (aiUser == null) {
             return R.fail("请先登录");
         }
 
         try {
-            AiTongueRecord record = buildTongueRecord(body.get("url"), aiUser.getId());
+            String imageUrl = validateImageUrl(body.get("url"));
+            AiTongueRecord record = new AiTongueRecord();
+            record.setUserId(aiUser.getId());
+            record.setImageUrl(imageUrl);
+            record.setCreatedAt(new Date());
+            record.setUpdatedAt(new Date());
             aiTongueRecordMapper.insertAiTongueRecord(record);
-            return R.ok(record);
+
+            Long recordId = record.getId();
+            startBackgroundTask("tongue", recordId, () -> completeTongueAnalyze(recordId, imageUrl, aiUser.getId()));
+            return R.ok(tongueStatusPayload(record), "accepted");
         } catch (Exception e) {
             return R.fail(e.getMessage());
         }
+    }
+
+    @GetMapping("/tongue/{recordId}")
+    public R<Map<String, Object>> getTongueAnalyzeResult(@PathVariable Long recordId) {
+        AiUser aiUser = UserHold.get();
+        if (aiUser == null) {
+            return R.fail("please login");
+        }
+
+        AiTongueRecord record = aiTongueRecordMapper.selectAiTongueRecordById(recordId);
+        if (record == null || !aiUser.getId().equals(record.getUserId())) {
+            return R.fail("record not found");
+        }
+        return R.ok(tongueStatusPayload(record));
     }
 
     @PostMapping("/face")
@@ -80,11 +105,7 @@ public class DoubaoVisionController {
         }
 
         try {
-            String imageUrl = body.get("url");
-            if (imageUrl == null || (!imageUrl.startsWith("http://") && !imageUrl.startsWith("https://"))) {
-                return R.fail("image url must be public http/https");
-            }
-
+            String imageUrl = validateImageUrl(body.get("url"));
             AiFaceRecord record = new AiFaceRecord();
             record.setUserId(aiUser.getId());
             record.setImageUrl(imageUrl);
@@ -93,25 +114,8 @@ public class DoubaoVisionController {
             aiFaceRecordMapper.insertAiFaceRecord(record);
 
             Long recordId = record.getId();
-            taskExecutor.execute(() -> completeFaceAnalyze(recordId, imageUrl, aiUser.getId()));
-
+            startBackgroundTask("face", recordId, () -> completeFaceAnalyze(recordId, imageUrl, aiUser.getId()));
             return R.ok(faceStatusPayload(record), "accepted");
-        } catch (Exception e) {
-            return R.fail(e.getMessage());
-        }
-    }
-
-    @PostMapping("/nail")
-    public R<AiNailRecord> analyzeNail(@RequestBody Map<String, String> body) {
-        AiUser aiUser = UserHold.get();
-        if (aiUser == null) {
-            return R.fail("请先登录");
-        }
-
-        try {
-            AiNailRecord record = buildNailRecord(body.get("url"), aiUser.getId());
-            aiNailRecordMapper.insertAiNailRecord(record);
-            return R.ok(record);
         } catch (Exception e) {
             return R.fail(e.getMessage());
         }
@@ -131,34 +135,98 @@ public class DoubaoVisionController {
         return R.ok(faceStatusPayload(record));
     }
 
-    @PostMapping("/report")
-    public R<Object> analyzeMedicalReport(@RequestBody Map<String, String> body) {
+    @PostMapping("/nail")
+    public R<Map<String, Object>> analyzeNail(@RequestBody Map<String, String> body) {
         AiUser aiUser = UserHold.get();
         if (aiUser == null) {
             return R.fail("请先登录");
         }
 
         try {
-            String visionJson = VisionJsonUtils.extractJsonObject(doubaoVisionService.analyzeMedicalReport(body.get("url")));
-            return R.ok(JSONUtil.parseObj(visionJson));
+            String imageUrl = validateImageUrl(body.get("url"));
+            AiNailRecord record = new AiNailRecord();
+            record.setUserId(aiUser.getId());
+            record.setImageUrl(imageUrl);
+            record.setCreatedAt(new Date());
+            record.setUpdatedAt(new Date());
+            aiNailRecordMapper.insertAiNailRecord(record);
+
+            Long recordId = record.getId();
+            startBackgroundTask("nail", recordId, () -> completeNailAnalyze(recordId, imageUrl, aiUser.getId()));
+            return R.ok(nailStatusPayload(record), "accepted");
+        } catch (Exception e) {
+            return R.fail(e.getMessage());
+        }
+    }
+
+    @GetMapping("/nail/{recordId}")
+    public R<Map<String, Object>> getNailAnalyzeResult(@PathVariable Long recordId) {
+        AiUser aiUser = UserHold.get();
+        if (aiUser == null) {
+            return R.fail("please login");
+        }
+
+        AiNailRecord record = aiNailRecordMapper.selectAiNailRecordById(recordId);
+        if (record == null || !aiUser.getId().equals(record.getUserId())) {
+            return R.fail("record not found");
+        }
+        return R.ok(nailStatusPayload(record));
+    }
+
+    @PostMapping("/report")
+    public R<Map<String, Object>> analyzeMedicalReport(@RequestBody Map<String, String> body) {
+        AiUser aiUser = UserHold.get();
+        if (aiUser == null) {
+            return R.fail("请先登录");
+        }
+
+        try {
+            String imageUrl = validateImageUrl(body.get("url"));
+            String taskId = createTask();
+            startJsonTask(taskId, () -> {
+                String visionJson = VisionJsonUtils.extractJsonObject(doubaoVisionService.analyzeMedicalReport(imageUrl));
+                return JSONUtil.parseObj(visionJson);
+            });
+            return R.ok(taskPayload(taskId), "accepted");
         } catch (Exception e) {
             return R.fail(e.getMessage());
         }
     }
 
     @PostMapping("/medicine")
-    public R<Object> analyzeMedicine(@RequestBody Map<String, String> body) {
+    public R<Map<String, Object>> analyzeMedicine(@RequestBody Map<String, String> body) {
         AiUser aiUser = UserHold.get();
         if (aiUser == null) {
             return R.fail("请先登录");
         }
 
         try {
-            String visionJson = VisionJsonUtils.extractJsonObject(doubaoVisionService.analyzeMedicine(body.get("url")));
-            return R.ok(JSONUtil.parseObj(visionJson));
+            String imageUrl = validateImageUrl(body.get("url"));
+            String taskId = createTask();
+            startJsonTask(taskId, () -> {
+                String visionJson = VisionJsonUtils.extractJsonObject(doubaoVisionService.analyzeMedicine(imageUrl));
+                return JSONUtil.parseObj(visionJson);
+            });
+            return R.ok(taskPayload(taskId), "accepted");
         } catch (Exception e) {
             return R.fail(e.getMessage());
         }
+    }
+
+    @GetMapping("/task/{taskId}")
+    public R<Map<String, Object>> getTaskResult(@PathVariable String taskId) {
+        Map<String, Object> task = aiTaskStore.get(taskId);
+        if (task == null) {
+            return R.fail("task not found");
+        }
+        return R.ok(task);
+    }
+
+    private String validateImageUrl(String imageUrl) {
+        if (imageUrl == null || (!imageUrl.startsWith("http://") && !imageUrl.startsWith("https://"))) {
+            throw new ServiceException("image url must be public http/https");
+        }
+        return imageUrl;
     }
 
     private AiTongueRecord buildTongueRecord(String imageUrl, Long userId) {
@@ -189,6 +257,22 @@ public class DoubaoVisionController {
         record.setSurfaceTexture(obj.getStr("surface_texture"));
         record.setHealthScore(tq.getBigDecimal("health_score"));
         return record;
+    }
+
+    private void completeTongueAnalyze(Long recordId, String imageUrl, Long userId) {
+        try {
+            AiTongueRecord result = buildTongueRecord(imageUrl, userId);
+            result.setId(recordId);
+            result.setUpdatedAt(new Date());
+            aiTongueRecordMapper.updateAiTongueRecord(result);
+        } catch (Exception e) {
+            log.error("Async tongue analyze failed, recordId={}", recordId, e);
+            AiTongueRecord failed = new AiTongueRecord();
+            failed.setId(recordId);
+            failed.setAiDiagnosis(FAILED_PREFIX + safeMessage(e));
+            failed.setUpdatedAt(new Date());
+            aiTongueRecordMapper.updateAiTongueRecord(failed);
+        }
     }
 
     private AiFaceRecord buildFaceRecord(String imageUrl, Long userId) {
@@ -228,38 +312,10 @@ public class DoubaoVisionController {
             log.error("Async face analyze failed, recordId={}", recordId, e);
             AiFaceRecord failed = new AiFaceRecord();
             failed.setId(recordId);
-            failed.setAiDiagnosis(FACE_FAILED_PREFIX + safeMessage(e));
+            failed.setAiDiagnosis(FAILED_PREFIX + safeMessage(e));
             failed.setUpdatedAt(new Date());
             aiFaceRecordMapper.updateAiFaceRecord(failed);
         }
-    }
-
-    private Map<String, Object> faceStatusPayload(AiFaceRecord record) {
-        Map<String, Object> data = new HashMap<>();
-        data.put("recordId", record.getId());
-        data.put("status", resolveFaceStatus(record));
-        data.put("record", record);
-        if (record.getAiDiagnosis() != null && record.getAiDiagnosis().startsWith(FACE_FAILED_PREFIX)) {
-            data.put("message", record.getAiDiagnosis().substring(FACE_FAILED_PREFIX.length()));
-        }
-        return data;
-    }
-
-    private String resolveFaceStatus(AiFaceRecord record) {
-        if (record.getAiDiagnosis() != null && record.getAiDiagnosis().startsWith(FACE_FAILED_PREFIX)) {
-            return FACE_STATUS_FAILED;
-        }
-        if (record.getVisionJson() == null || record.getVisionJson().isBlank()) {
-            return FACE_STATUS_PROCESSING;
-        }
-        if (record.getFqDetected() == null || record.getFqDetected() != 1) {
-            return FACE_STATUS_FAILED;
-        }
-        return FACE_STATUS_SUCCESS;
-    }
-
-    private String safeMessage(Exception e) {
-        return e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
     }
 
     private AiNailRecord buildNailRecord(String imageUrl, Long userId) {
@@ -287,5 +343,136 @@ public class DoubaoVisionController {
         record.setNotes(obj.getStr("notes"));
         record.setHealthScore(tq.getBigDecimal("health_score"));
         return record;
+    }
+
+    private void completeNailAnalyze(Long recordId, String imageUrl, Long userId) {
+        try {
+            AiNailRecord result = buildNailRecord(imageUrl, userId);
+            result.setId(recordId);
+            result.setUpdatedAt(new Date());
+            aiNailRecordMapper.updateAiNailRecord(result);
+        } catch (Exception e) {
+            log.error("Async nail analyze failed, recordId={}", recordId, e);
+            AiNailRecord failed = new AiNailRecord();
+            failed.setId(recordId);
+            failed.setAiDiagnosis(FAILED_PREFIX + safeMessage(e));
+            failed.setUpdatedAt(new Date());
+            aiNailRecordMapper.updateAiNailRecord(failed);
+        }
+    }
+
+    private Map<String, Object> tongueStatusPayload(AiTongueRecord record) {
+        Map<String, Object> data = baseStatusPayload(record.getId(), resolveTongueStatus(record), record);
+        addFailureMessage(data, record.getAiDiagnosis());
+        return data;
+    }
+
+    private String resolveTongueStatus(AiTongueRecord record) {
+        if (isFailed(record.getAiDiagnosis())) return STATUS_FAILED;
+        if (record.getVisionJson() == null || record.getVisionJson().isBlank()) return STATUS_PROCESSING;
+        if (record.getTqDetected() == null || record.getTqDetected() != 1) return STATUS_FAILED;
+        return STATUS_SUCCESS;
+    }
+
+    private Map<String, Object> faceStatusPayload(AiFaceRecord record) {
+        Map<String, Object> data = baseStatusPayload(record.getId(), resolveFaceStatus(record), record);
+        addFailureMessage(data, record.getAiDiagnosis());
+        return data;
+    }
+
+    private String resolveFaceStatus(AiFaceRecord record) {
+        if (isFailed(record.getAiDiagnosis())) return STATUS_FAILED;
+        if (record.getVisionJson() == null || record.getVisionJson().isBlank()) return STATUS_PROCESSING;
+        if (record.getFqDetected() == null || record.getFqDetected() != 1) return STATUS_FAILED;
+        return STATUS_SUCCESS;
+    }
+
+    private Map<String, Object> nailStatusPayload(AiNailRecord record) {
+        Map<String, Object> data = baseStatusPayload(record.getId(), resolveNailStatus(record), record);
+        addFailureMessage(data, record.getAiDiagnosis());
+        return data;
+    }
+
+    private String resolveNailStatus(AiNailRecord record) {
+        if (isFailed(record.getAiDiagnosis())) return STATUS_FAILED;
+        if (record.getVisionJson() == null || record.getVisionJson().isBlank()) return STATUS_PROCESSING;
+        if (record.getNqDetected() == null || record.getNqDetected() != 1) return STATUS_FAILED;
+        return STATUS_SUCCESS;
+    }
+
+    private Map<String, Object> baseStatusPayload(Long recordId, String status, Object record) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("recordId", recordId);
+        data.put("status", status);
+        data.put("record", record);
+        return data;
+    }
+
+    private boolean isFailed(String aiDiagnosis) {
+        return aiDiagnosis != null && aiDiagnosis.startsWith(FAILED_PREFIX);
+    }
+
+    private void addFailureMessage(Map<String, Object> data, String aiDiagnosis) {
+        if (isFailed(aiDiagnosis)) {
+            data.put("message", aiDiagnosis.substring(FAILED_PREFIX.length()));
+        }
+    }
+
+    private String createTask() {
+        String taskId = UUID.randomUUID().toString();
+        aiTaskStore.put(taskId, taskPayload(taskId));
+        return taskId;
+    }
+
+    private Map<String, Object> taskPayload(String taskId) {
+        Map<String, Object> task = new HashMap<>();
+        task.put("taskId", taskId);
+        task.put("status", STATUS_PROCESSING);
+        return task;
+    }
+
+    private void startJsonTask(String taskId, JsonTask task) {
+        try {
+            aiTaskExecutor.execute(() -> completeJsonTask(taskId, task));
+        } catch (Exception e) {
+            log.error("Async json task submit failed, taskId={}", taskId, e);
+            Map<String, Object> data = new HashMap<>();
+            data.put("taskId", taskId);
+            data.put("status", STATUS_FAILED);
+            data.put("message", safeMessage(e));
+            aiTaskStore.put(taskId, data);
+        }
+    }
+
+    private void startBackgroundTask(String type, Long recordId, Runnable task) {
+        try {
+            aiTaskExecutor.execute(task);
+        } catch (Exception e) {
+            log.error("Async {} task submit failed, recordId={}", type, recordId, e);
+            throw new ServiceException("AI task submit failed: " + safeMessage(e));
+        }
+    }
+
+    private void completeJsonTask(String taskId, JsonTask task) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", taskId);
+        try {
+            data.put("status", STATUS_SUCCESS);
+            data.put("result", task.run());
+        } catch (Exception e) {
+            log.error("Async json task failed, taskId={}", taskId, e);
+            data.put("status", STATUS_FAILED);
+            data.put("message", safeMessage(e));
+        }
+        aiTaskStore.put(taskId, data);
+    }
+
+    private String safeMessage(Exception e) {
+        return e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+    }
+
+    @FunctionalInterface
+    private interface JsonTask {
+        Object run();
     }
 }
