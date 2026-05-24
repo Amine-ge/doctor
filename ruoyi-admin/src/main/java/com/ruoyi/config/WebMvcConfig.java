@@ -16,6 +16,12 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(authInterceptor)
                 .addPathPatterns("/api/**")          // 拦截哪些接口
-                .excludePathPatterns("/api/user/wxLogin","/api/oss/upload","/api/banners/**");// 放行登录/回调接口
+                .excludePathPatterns(
+                        "/api/user/wxLogin",
+                        "/api/oss/upload",
+                        "/api/banners/**",
+                        "/api/Aicherb",
+                        "/api/Aicherb/**"
+                );// 放行登录/回调接口
     }
 }

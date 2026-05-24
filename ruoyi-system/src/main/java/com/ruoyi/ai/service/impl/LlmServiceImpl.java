@@ -147,6 +147,13 @@ public class LlmServiceImpl implements LlmService {
 
     @Override
     public String generateTongueDiagnosis(Long id, com.alibaba.fastjson2.JSONObject finalJson) {
+        AiTongueRecord record = aiTongueRecordMapper.selectAiTongueRecordById(id);
+        if (record == null) {
+            throw new IllegalArgumentException("Tongue record not found");
+        }
+        if (record.getTqDetected() == null || record.getTqDetected() != 1) {
+            throw new IllegalArgumentException("No tongue detected, cannot generate tongue report");
+        }
         String text = generate(AiPrompts.SYS_TONGUE_EXPLAIN, finalJson);
         aiTongueRecordMapper.updateDiagnosis(id, text);
         return text ;
@@ -168,6 +175,13 @@ public class LlmServiceImpl implements LlmService {
 
     @Override
     public String generateNailDiagnosis(Long id, com.alibaba.fastjson2.JSONObject finalJson) {
+        AiNailRecord record = aiNailRecordMapper.selectAiNailRecordById(id);
+        if (record == null) {
+            throw new IllegalArgumentException("Nail record not found");
+        }
+        if (record.getNqDetected() == null || record.getNqDetected() != 1) {
+            throw new IllegalArgumentException("No nail detected, cannot generate nail report");
+        }
         String text = generate(AiPrompts.SYS_NAIL_EXPLAIN, finalJson);
         aiNailRecordMapper.updateDiagnosis(id, text);
         return text ;

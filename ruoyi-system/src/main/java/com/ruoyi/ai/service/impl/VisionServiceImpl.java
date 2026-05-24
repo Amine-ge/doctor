@@ -158,7 +158,11 @@ public class VisionServiceImpl implements VisionService {
         var obj = JSONUtil.parseObj(clean);
         JSONObject tq = obj.getJSONObject("nail_quality");
 
-        record.setNqDetected(Convert.toBool(tq.get("detected"), false) ? 1 : 0);
+        int detected = Convert.toBool(tq.get("detected"), false) ? 1 : 0;
+        if (detected == 0) {
+            throw new ServiceException("No nail detected in image");
+        }
+        record.setNqDetected(detected);
         record.setNqLightingOk(Convert.toBool(tq.get("lighting_ok"), false) ? 1 : 0);
         record.setNqOcclusionOk(Convert.toBool(tq.get("occlusion_ok"), false) ? 1 : 0);
         record.setNqQualityScore(Convert.toBigDecimal(tq.get("quality_score"), BigDecimal.ZERO));

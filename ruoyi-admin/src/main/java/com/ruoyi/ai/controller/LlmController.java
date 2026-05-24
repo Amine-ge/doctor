@@ -35,7 +35,11 @@ public class LlmController {
 
     @PostMapping("/tongue/{id}/generate")
     public R<?> generateTongue(@PathVariable Long id, @RequestBody JSONObject finalJson) {
-        return R.ok(  service.generateTongueDiagnosis(id, finalJson));
+        try {
+            return R.ok(service.generateTongueDiagnosis(id, finalJson));
+        } catch (Exception e) {
+            return R.fail(e.getMessage());
+        }
     }
 
     @PostMapping("/face/{id}/generate")
@@ -48,7 +52,11 @@ public class LlmController {
     }
     @PostMapping("/nail/{id}/generate")
     public R<?> generateNail(@PathVariable Long id, @RequestBody JSONObject finalJson) {
-        return R.ok(service.generateNailDiagnosis(id, finalJson));
+        try {
+            return R.ok(service.generateNailDiagnosis(id, finalJson));
+        } catch (Exception e) {
+            return R.fail(e.getMessage());
+        }
     }
 
 }

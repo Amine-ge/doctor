@@ -96,7 +96,7 @@ public class AiUserServiceImpl extends ServiceImpl<AiUserMapper, AiUser> impleme
                 user.setNickname(userDto.getNickName());
             }
             if (userDto.getAvatarUrl() != null) {
-                user.setAvatarUrl(userDto.getAvatarUrl());
+                user.setAvatarUrl(normalizeAvatarUrl(userDto.getAvatarUrl()));
             }
 
             aiUserMapper.insertAiUser(user);
@@ -115,7 +115,7 @@ public class AiUserServiceImpl extends ServiceImpl<AiUserMapper, AiUser> impleme
         UserVo userVo = new UserVo();
         userVo.setId(user.getId());
         userVo.setNickname(user.getNickname());
-        userVo.setAvatarUrl(user.getAvatarUrl());
+        userVo.setAvatarUrl(normalizeAvatarUrl(user.getAvatarUrl()));
         userVo.setPhone(user.getPhone());
         userVo.setAge(user.getAge());
         userVo.setGender(user.getGender());
@@ -142,7 +142,22 @@ public class AiUserServiceImpl extends ServiceImpl<AiUserMapper, AiUser> impleme
     @Override
     public void updateUser(AiUser user) {
 //        user.setUpdatedAt(DateTime.now());
+        user.setAvatarUrl(normalizeAvatarUrl(user.getAvatarUrl()));
         aiUserMapper.updateAiUser(user);
+    }
+
+    private String normalizeAvatarUrl(String avatarUrl) {
+        if (avatarUrl == null) {
+            return null;
+        }
+        String value = avatarUrl.trim();
+        if (value.startsWith("http://tmp/")
+                || value.startsWith("wxfile://")
+                || value.startsWith("cloud://")
+                || value.contains("/tmp/")) {
+            return null;
+        }
+        return value;
     }
 
     private String getOpenid(UserDTO userLoginDTO) {

@@ -266,12 +266,16 @@ public class DoubaoVisionController {
         String visionJson = VisionJsonUtils.extractJsonObject(doubaoVisionService.analyzeNail(imageUrl));
         JSONObject obj = JSONUtil.parseObj(visionJson);
         JSONObject tq = obj.getJSONObject("nail_quality");
+        int detected = Convert.toBool(tq.get("detected"), false) ? 1 : 0;
+        if (detected == 0) {
+            throw new ServiceException("No nail detected in image");
+        }
 
         AiNailRecord record = new AiNailRecord();
         record.setUserId(userId);
         record.setImageUrl(imageUrl);
         record.setVisionJson(visionJson);
-        record.setNqDetected(Convert.toBool(tq.get("detected"), false) ? 1 : 0);
+        record.setNqDetected(detected);
         record.setNqLightingOk(Convert.toBool(tq.get("lighting_ok"), false) ? 1 : 0);
         record.setNqOcclusionOk(Convert.toBool(tq.get("occlusion_ok"), false) ? 1 : 0);
         record.setNqQualityScore(Convert.toBigDecimal(tq.get("quality_score"), BigDecimal.ZERO));
