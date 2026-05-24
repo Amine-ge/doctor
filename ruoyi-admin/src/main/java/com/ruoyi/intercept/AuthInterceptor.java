@@ -15,6 +15,9 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.List;
 
 @Component
 public class AuthInterceptor implements HandlerInterceptor {
@@ -28,13 +31,14 @@ public class AuthInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest req, HttpServletResponse resp, Object handler) throws IOException {
         String headerName = wecomProps.getAuthHeader();
-        String raw = req.getHeader(headerName);
-        if (raw == null || raw.isEmpty()) return unauthorized(resp, "缺少 X-Wecom-Token");
+        String raw = resolveHeader(req, headerName);
+        if (raw == null || raw.trim().isEmpty()) {
+            return unauthorized(resp, "缺少 " + headerName);
+        }
 
-        // 兼容可能误加了 "Bearer "
-        String token = raw.startsWith("Bearer ") ? raw.substring(7) : raw;
+        String token = raw.trim();
+        token = token.regionMatches(true, 0, "Bearer ", 0, 7) ? token.substring(7).trim() : token;
 
-        // 1) 解析 JWT
         io.jsonwebtoken.Claims claims;
         try {
             claims = MyJwtUtil.parseJWT(wecomProps.getSecret(), token);
@@ -42,22 +46,48 @@ public class AuthInterceptor implements HandlerInterceptor {
             return unauthorized(resp, "token 无效");
         }
 
-        // 2) 取出用户 JSON -> 对象
         String userJson = (String) claims.get(JwtClaimsConstant.USER);
         AiUser me = JSONUtil.toBean(userJson, AiUser.class);
 
-        // 3) Redis 二次校验（顶号/过期）
-        String key = JwtClaimsConstant.REDIS_TOKEN_PREFIX + me.getId(); // login:tk:<id>
+        String key = JwtClaimsConstant.REDIS_TOKEN_PREFIX + me.getId();
         String cached = stringRedisTemplate.opsForValue().get(key);
         if (cached == null || !cached.equals(token)) {
             return unauthorized(resp, "token 已过期或失效");
         }
 
-        // 4) 放到上下文（两种都给）
-//        req.setAttribute("currentTeacher", me);
-//        UserContext.set(me);
         UserHold.set(me);
         return true;
+    }
+
+    private static String resolveHeader(HttpServletRequest req, String configuredName) {
+        List<String> candidates = new ArrayList<>();
+        if (configuredName != null && !configuredName.trim().isEmpty()) {
+            candidates.add(configuredName.trim());
+        }
+        candidates.add("X-Wecom-Token");
+        candidates.add("X-wecom-token");
+        candidates.add("x-wecom-token");
+
+        for (String candidate : candidates) {
+            String value = req.getHeader(candidate);
+            if (value != null && !value.trim().isEmpty()) {
+                return value;
+            }
+        }
+
+        Enumeration<String> names = req.getHeaderNames();
+        while (names != null && names.hasMoreElements()) {
+            String actualName = names.nextElement();
+            for (String candidate : candidates) {
+                if (actualName.equalsIgnoreCase(candidate)) {
+                    String value = req.getHeader(actualName);
+                    if (value != null && !value.trim().isEmpty()) {
+                        return value;
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     private static boolean unauthorized(HttpServletResponse resp, String msg) throws IOException {
@@ -69,6 +99,5 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
-//        UserContext.clear();
     }
 }
