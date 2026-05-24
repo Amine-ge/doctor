@@ -23,7 +23,14 @@ public class LlmController {
         if (aiUser == null) {
             return R.fail("请先登录");
         }
-        return R.ok(service.ask(dto.getQuestion(),dto.getFaceId(),dto.getNailId(),dto.getTongueId(), aiUser.getId()));
+        try {
+            if (dto == null) {
+                return R.fail("request body is required");
+            }
+            return R.ok(service.ask(dto.getQuestion(),dto.getFaceId(),dto.getNailId(),dto.getTongueId(), aiUser.getId()));
+        } catch (Exception e) {
+            return R.fail(e.getMessage());
+        }
     }
 
     @PostMapping("/tongue/{id}/generate")

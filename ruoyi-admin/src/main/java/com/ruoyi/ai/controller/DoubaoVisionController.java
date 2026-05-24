@@ -15,6 +15,11 @@ import com.ruoyi.ai.utils.VisionJsonUtils;
 import com.ruoyi.common.core.domain.R;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.utils.UserHold;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,11 +27,19 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/ai")
 public class DoubaoVisionController {
+
+    private static final Logger log = LoggerFactory.getLogger(DoubaoVisionController.class);
+    private static final String FACE_STATUS_PROCESSING = "PROCESSING";
+    private static final String FACE_STATUS_SUCCESS = "SUCCESS";
+    private static final String FACE_STATUS_FAILED = "FAILED";
+    private static final String FACE_FAILED_PREFIX = "FAILED: ";
 
     @Resource
     private DoubaoVisionService doubaoVisionService;
@@ -39,6 +52,9 @@ public class DoubaoVisionController {
 
     @Resource
     private AiNailRecordMapper aiNailRecordMapper;
+
+    @Resource(name = "threadPoolTaskExecutor")
+    private ThreadPoolTaskExecutor taskExecutor;
 
     @PostMapping("/tongue")
     public R<AiTongueRecord> analyzeTongue(@RequestBody Map<String, String> body) {
@@ -57,16 +73,29 @@ public class DoubaoVisionController {
     }
 
     @PostMapping("/face")
-    public R<AiFaceRecord> analyzeFace(@RequestBody Map<String, String> body) {
+    public R<Map<String, Object>> analyzeFace(@RequestBody Map<String, String> body) {
         AiUser aiUser = UserHold.get();
         if (aiUser == null) {
             return R.fail("请先登录");
         }
 
         try {
-            AiFaceRecord record = buildFaceRecord(body.get("url"), aiUser.getId());
+            String imageUrl = body.get("url");
+            if (imageUrl == null || (!imageUrl.startsWith("http://") && !imageUrl.startsWith("https://"))) {
+                return R.fail("image url must be public http/https");
+            }
+
+            AiFaceRecord record = new AiFaceRecord();
+            record.setUserId(aiUser.getId());
+            record.setImageUrl(imageUrl);
+            record.setCreatedAt(new Date());
+            record.setUpdatedAt(new Date());
             aiFaceRecordMapper.insertAiFaceRecord(record);
-            return R.ok(record);
+
+            Long recordId = record.getId();
+            taskExecutor.execute(() -> completeFaceAnalyze(recordId, imageUrl, aiUser.getId()));
+
+            return R.ok(faceStatusPayload(record), "accepted");
         } catch (Exception e) {
             return R.fail(e.getMessage());
         }
@@ -86,6 +115,20 @@ public class DoubaoVisionController {
         } catch (Exception e) {
             return R.fail(e.getMessage());
         }
+    }
+
+    @GetMapping("/face/{recordId}")
+    public R<Map<String, Object>> getFaceAnalyzeResult(@PathVariable Long recordId) {
+        AiUser aiUser = UserHold.get();
+        if (aiUser == null) {
+            return R.fail("please login");
+        }
+
+        AiFaceRecord record = aiFaceRecordMapper.selectAiFaceRecordById(recordId);
+        if (record == null || !aiUser.getId().equals(record.getUserId())) {
+            return R.fail("record not found");
+        }
+        return R.ok(faceStatusPayload(record));
     }
 
     @PostMapping("/report")
@@ -169,6 +212,47 @@ public class DoubaoVisionController {
         record.setNotes(obj.getStr("notes"));
         record.setHealthScore(tq.getBigDecimal("health_score"));
         return record;
+    }
+
+    private void completeFaceAnalyze(Long recordId, String imageUrl, Long userId) {
+        try {
+            AiFaceRecord result = buildFaceRecord(imageUrl, userId);
+            result.setId(recordId);
+            result.setUpdatedAt(new Date());
+            aiFaceRecordMapper.updateAiFaceRecord(result);
+        } catch (Exception e) {
+            log.error("Async face analyze failed, recordId={}", recordId, e);
+            AiFaceRecord failed = new AiFaceRecord();
+            failed.setId(recordId);
+            failed.setAiDiagnosis(FACE_FAILED_PREFIX + safeMessage(e));
+            failed.setUpdatedAt(new Date());
+            aiFaceRecordMapper.updateAiFaceRecord(failed);
+        }
+    }
+
+    private Map<String, Object> faceStatusPayload(AiFaceRecord record) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("recordId", record.getId());
+        data.put("status", resolveFaceStatus(record));
+        data.put("record", record);
+        if (record.getAiDiagnosis() != null && record.getAiDiagnosis().startsWith(FACE_FAILED_PREFIX)) {
+            data.put("message", record.getAiDiagnosis().substring(FACE_FAILED_PREFIX.length()));
+        }
+        return data;
+    }
+
+    private String resolveFaceStatus(AiFaceRecord record) {
+        if (record.getAiDiagnosis() != null && record.getAiDiagnosis().startsWith(FACE_FAILED_PREFIX)) {
+            return FACE_STATUS_FAILED;
+        }
+        if (record.getVisionJson() == null || record.getVisionJson().isBlank()) {
+            return FACE_STATUS_PROCESSING;
+        }
+        return FACE_STATUS_SUCCESS;
+    }
+
+    private String safeMessage(Exception e) {
+        return e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
     }
 
     private AiNailRecord buildNailRecord(String imageUrl, Long userId) {
