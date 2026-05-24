@@ -24,10 +24,9 @@ import com.ruoyi.ai.mapper.AiTongueRecordMapper;
 import com.ruoyi.ai.mapper.AiUserMapper;
 import com.ruoyi.ai.service.IAiUserService;
 import com.ruoyi.properties.WeChatProperties;
-import com.ruoyi.utils.HttpClientUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
+import org.springframework.web.util.UriComponentsBuilder;
 /**
  * 用户信息Service业务层处理
  */
@@ -150,17 +149,38 @@ public class AiUserServiceImpl extends ServiceImpl<AiUserMapper, AiUser> impleme
 
 
     private String getOpenid(UserDTO userLoginDTO) {
-        Map<String, String> map = new HashMap<>();
-        map.put("appid", weChatProperties.getAppid());
-        map.put("secret", weChatProperties.getSecret());
-        map.put("js_code", userLoginDTO.getCode());
-        map.put("grant_type", "authorization_code");
-        String json = HttpClientUtil.doGet(WX_LOGIN, map);
+        String url = org.springframework.web.util.UriComponentsBuilder
+                .fromHttpUrl(WX_LOGIN)
+                .queryParam("appid", weChatProperties.getAppid())
+                .queryParam("secret", weChatProperties.getSecret())
+                .queryParam("js_code", userLoginDTO.getCode())
+                .queryParam("grant_type", "authorization_code")
+                .toUriString();
+
+        org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
+
+        String json = restTemplate.getForObject(url, String.class);
+
+        System.out.println("微信 jscode2session 返回：" + json);
 
         JSONObject jsonObject = JSON.parseObject(json);
-        return jsonObject.getString("openid");
-    }
 
+        if (jsonObject == null) {
+            throw new RuntimeException("微信登录失败：微信接口返回为空");
+        }
+
+        if (jsonObject.containsKey("errcode")) {
+            throw new RuntimeException("微信登录失败：" + jsonObject.toJSONString());
+        }
+
+        String openid = jsonObject.getString("openid");
+
+        if (openid == null || openid.trim().isEmpty()) {
+            throw new RuntimeException("微信登录失败：openid为空，微信返回：" + json);
+        }
+
+        return openid;
+    }
     private LatestHealthDataVo.Item buildTongueItem(AiTongueRecord r) {
         LatestHealthDataVo.Item item = new LatestHealthDataVo.Item();
         if (r == null) {
