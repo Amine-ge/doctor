@@ -75,26 +75,29 @@ public class LlmController {
     }
 
     @PostMapping("/tongue/{id}/generate")
-    public R<?> generateTongue(@PathVariable Long id, @RequestBody JSONObject finalJson) {
+    public R<Map<String, Object>> generateTongue(@PathVariable Long id, @RequestBody JSONObject finalJson) {
         try {
-            return R.ok(service.generateTongueDiagnosis(id, finalJson));
+            String taskId = aiAsyncTaskManager.submit(() -> service.generateTongueDiagnosis(id, finalJson));
+            return R.ok(aiAsyncTaskManager.processingPayload(taskId), "accepted");
         } catch (Exception e) {
             return R.fail(e.getMessage());
         }
     }
 
     @PostMapping("/face/{id}/generate")
-    public R<?> generateFace(@PathVariable Long id, @RequestBody JSONObject finalJson) {
+    public R<Map<String, Object>> generateFace(@PathVariable Long id, @RequestBody JSONObject finalJson) {
         try {
-            return R.ok(service.generateFaceDiagnosis(id, finalJson));
+            String taskId = aiAsyncTaskManager.submit(() -> service.generateFaceDiagnosis(id, finalJson));
+            return R.ok(aiAsyncTaskManager.processingPayload(taskId), "accepted");
         } catch (Exception e) {
             return R.fail(e.getMessage());
         }
     }
     @PostMapping("/nail/{id}/generate")
-    public R<?> generateNail(@PathVariable Long id, @RequestBody JSONObject finalJson) {
+    public R<Map<String, Object>> generateNail(@PathVariable Long id, @RequestBody JSONObject finalJson) {
         try {
-            return R.ok(service.generateNailDiagnosis(id, finalJson));
+            String taskId = aiAsyncTaskManager.submit(() -> service.generateNailDiagnosis(id, finalJson));
+            return R.ok(aiAsyncTaskManager.processingPayload(taskId), "accepted");
         } catch (Exception e) {
             return R.fail(e.getMessage());
         }
