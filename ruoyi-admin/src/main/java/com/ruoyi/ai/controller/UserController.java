@@ -12,6 +12,7 @@ import com.ruoyi.ai.domain.vo.HealthTrendRangeVO;
 import com.ruoyi.ai.domain.vo.LatestHealthDataVo;
 import com.ruoyi.ai.domain.vo.UserVo;
 import com.ruoyi.ai.service.*;
+import com.ruoyi.ai.support.AiAsyncTaskManager;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.domain.R;
 import com.ruoyi.common.utils.SecurityUtils;
@@ -42,6 +43,7 @@ public class UserController {
     private final IAiNailRecordService nailRecordService;
     private final IAiSymptomReportService aiSymptomReportService;
     private final HealthTrendService trendService;
+    private final AiAsyncTaskManager aiAsyncTaskManager;
 
     @PostMapping("/wxLogin")
     public R login(@RequestBody UserDTO userDto) {
@@ -147,12 +149,15 @@ public class UserController {
     public AjaxResult getTrend() {
         Long userId = UserHold.get().getId();
 
-        Map<String, HealthTrendRangeVO> map = new HashMap<>();
-        map.put("7d", trendService.getHealthTrend("7d", userId));
-        map.put("1m", trendService.getHealthTrend("1m", userId));
-        map.put("6m", trendService.getHealthTrend("6m", userId));
+        String taskId = aiAsyncTaskManager.submit(() -> {
+            Map<String, HealthTrendRangeVO> map = new HashMap<>();
+            map.put("7d", trendService.getHealthTrend("7d", userId));
+            map.put("1m", trendService.getHealthTrend("1m", userId));
+            map.put("6m", trendService.getHealthTrend("6m", userId));
+            return map;
+        });
 
-        return AjaxResult.success(map);
+        return AjaxResult.success(aiAsyncTaskManager.processingPayload(taskId));
     }
 
 }

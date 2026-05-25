@@ -25,7 +25,7 @@ public class LlmController {
     private AiAsyncTaskManager aiAsyncTaskManager;
 
     @PostMapping("/ask")
-    public R<String> summary(@RequestBody AskDTO dto) {
+    public R<Map<String, Object>> summary(@RequestBody AskDTO dto) {
         AiUser aiUser = UserHold.get();
         if (aiUser == null) {
             return R.fail("请先登录");
@@ -34,7 +34,11 @@ public class LlmController {
             if (dto == null) {
                 return R.fail("request body is required");
             }
-            return R.ok(service.ask(dto.getQuestion(),dto.getFaceId(),dto.getNailId(),dto.getTongueId(), aiUser.getId()));
+            Long userId = aiUser.getId();
+            String taskId = aiAsyncTaskManager.submit(() ->
+                    service.ask(dto.getQuestion(), dto.getFaceId(), dto.getNailId(), dto.getTongueId(), userId)
+            );
+            return R.ok(aiAsyncTaskManager.processingPayload(taskId), "accepted");
         } catch (Exception e) {
             return R.fail(e.getMessage());
         }

@@ -1,10 +1,8 @@
 package com.ruoyi.ai.controller;
 
-import com.ruoyi.ai.domain.AiFaceRecord;
-import com.ruoyi.ai.domain.AiNailRecord;
-import com.ruoyi.ai.domain.AiTongueRecord;
 import com.ruoyi.ai.domain.AiUser;
 import com.ruoyi.ai.service.VisionService;
+import com.ruoyi.ai.support.AiAsyncTaskManager;
 import com.ruoyi.common.annotation.Anonymous;
 import com.ruoyi.common.core.domain.R;
 import com.ruoyi.common.exception.ServiceException;
@@ -21,40 +19,54 @@ public class VisionController {
     @Resource
     private VisionService service;
 
+    @Resource
+    private AiAsyncTaskManager aiAsyncTaskManager;
+
     @PostMapping("/tongue")
-    public R<AiTongueRecord> analyzeTongue(@RequestBody Map<String, String> body) {
+    public R<Map<String, Object>> analyzeTongue(@RequestBody Map<String, String> body) {
         AiUser aiUser = UserHold.get();
         if (aiUser == null) {
             return R.fail("请先登录");
         }
-        AiTongueRecord record = null;
         try {
-            record = service.tongue(body.get("url"), aiUser.getId());
+            Long userId = aiUser.getId();
+            String imageUrl = body.get("url");
+            String taskId = aiAsyncTaskManager.submit(() -> service.tongue(imageUrl, userId));
+            return R.ok(aiAsyncTaskManager.processingPayload(taskId), "accepted");
         } catch (ServiceException e) {
             return R.fail(e.getMessage());
         }
-        return R.ok(record);
     }
 
     @PostMapping("/face")
-    public R<AiFaceRecord> analyzeFace(@RequestBody Map<String, String> body) {
+    public R<Map<String, Object>> analyzeFace(@RequestBody Map<String, String> body) {
         AiUser aiUser = UserHold.get();
         if (aiUser == null) {
             return R.fail("请先登录");
         }
         try {
-            return R.ok(service.face(body.get("url"),aiUser.getId()));
+            Long userId = aiUser.getId();
+            String imageUrl = body.get("url");
+            String taskId = aiAsyncTaskManager.submit(() -> service.face(imageUrl, userId));
+            return R.ok(aiAsyncTaskManager.processingPayload(taskId), "accepted");
         } catch (ServiceException e) {
             return R.fail(e.getMessage());
         }
     }
 
     @PostMapping("/nail")
-    public R<AiNailRecord> analyzeNail(@RequestBody Map<String, String> body) {
+    public R<Map<String, Object>> analyzeNail(@RequestBody Map<String, String> body) {
         AiUser aiUser = UserHold.get();
         if (aiUser == null) {
             return R.fail("请先登录");
         }
-        return R.ok(service.nail(body.get("url"),aiUser.getId()));
+        try {
+            Long userId = aiUser.getId();
+            String imageUrl = body.get("url");
+            String taskId = aiAsyncTaskManager.submit(() -> service.nail(imageUrl, userId));
+            return R.ok(aiAsyncTaskManager.processingPayload(taskId), "accepted");
+        } catch (ServiceException e) {
+            return R.fail(e.getMessage());
+        }
     }
 }
