@@ -2,10 +2,9 @@ package com.ruoyi.ai.service.impl;
 
 import cn.hutool.json.JSONObject;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.ruoyi.consts.AiModels;
 import com.ruoyi.consts.AiPrompts;
 import com.ruoyi.ai.service.LlmService;
-import com.ruoyi.utils.DashScopeUtils;
+import com.ruoyi.utils.DoubaoTextUtils;
 import org.springframework.stereotype.Service;
 import cn.hutool.json.JSONUtil;
 import lombok.RequiredArgsConstructor;
@@ -101,11 +100,7 @@ public class LlmServiceImpl implements LlmService {
             ctx.set("nail", JSONUtil.parseObj(nail.getVisionJson()));
         }
 
-        String chat = DashScopeUtils.chat(
-                AiModels.LLM_DEFAULT,
-                AiPrompts.SYS_TEXT_SUMMARY,
-                ctx.toString()
-        );
+        String chat = DoubaoTextUtils.chat(AiPrompts.SYS_TEXT_SUMMARY, ctx.toString());
 
         // ====== 解析 AI 返回 ======
         int overallScore = 0;
@@ -197,11 +192,7 @@ public class LlmServiceImpl implements LlmService {
         }
 
 
-        String raw = DashScopeUtils.chat(
-                AiModels.LLM_DEFAULT,
-                AiPrompts.SYS_TREND_ADVICE_POLISH,
-                ruleAdviceJson.toString()
-        );
+        String raw = DoubaoTextUtils.chat(AiPrompts.SYS_TREND_ADVICE_POLISH, ruleAdviceJson.toString());
 
         return raw;
     }
@@ -211,10 +202,6 @@ public class LlmServiceImpl implements LlmService {
      */
     private String generate(String systemPrompt, com.alibaba.fastjson2.JSONObject finalJson) {
         String payload = finalJson.toString();
-        return DashScopeUtils.chat(
-                AiModels.LLM_DEFAULT,
-                systemPrompt,
-                payload
-        );
+        return DoubaoTextUtils.chat(systemPrompt, payload);
     }
 }
